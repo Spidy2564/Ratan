@@ -111,59 +111,6 @@ const resolveImageUrl = (imageUrl: string): string => {
   console.log('✅ Resolved filename URL:', resolvedUrl);
   return resolvedUrl;
 };
-const handlePaymentSuccess = async () => {
-  try {
-    // Your existing success logic...
-    setCartItems([]);
-    setCart(new Set());
-    setShowCheckout(false);
-
-    // NEW: Send order data to trigger notifications
-    const orderData = {
-      userId: user?.id || 'guest',
-      userEmail: user?.email || userDetails.email,
-      userName: user?.name || userDetails.name,
-      items: cartItems.map(item => ({
-        productId: item.product.id.toString(),
-        productName: item.product.name,
-        price: parseFloat(item.product.price),
-        quantity: item.quantity,
-        size: item.size || null
-      })),
-      totalAmount: cartItems.reduce((sum, item) => sum + parseFloat(item.product.price) * item.quantity, 0),
-      paymentMethod: paymentMethod, // 'razorpay' or 'cod'
-      shippingAddress: userDetails,
-      phone: userDetails.phone,
-      address: userDetails.address
-    };
-
-    console.log('📦 Sending order data:', orderData);
-
-    // Send order to server (this will trigger admin notifications)
-    const response = await fetch('/api/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(orderData)
-    });
-
-    const result = await response.json();
-
-    if (result.success) {
-      console.log('✅ Order created successfully:', result.data);
-      console.log('📡 Admin notification sent:', result.notificationSent);
-      alert('🎉 Order placed successfully! Admins have been notified.');
-    } else {
-      console.error('❌ Order creation failed:', result.message);
-      alert('❌ Order failed: ' + result.message);
-    }
-
-  } catch (error) {
-    console.error('❌ Order submission error:', error);
-    alert('❌ Failed to submit order. Please try again.');
-  }
-};
 
 // ✅ FIXED: API functions with consistent response handling
 const fetchProducts = async (filters?: { category?: string; featured?: boolean; inStock?: boolean }): Promise<Product[]> => {
@@ -1158,6 +1105,13 @@ const CheckoutPage = ({
         createdAt: new Date().toISOString()
       };
 
+      const response = await axios.post(`${API_BASE}/api/mail`, { purchase });
+      if (response.data.success) {
+        alert('🎉 Order placed successfully! Check your email for confirmation.');
+      } else {
+        alert('Email not sent.');
+      }
+
       const existingPurchases = JSON.parse(localStorage.getItem('all_purchases') || '[]');
       existingPurchases.push(purchase);
       localStorage.setItem('all_purchases', JSON.stringify(existingPurchases));
@@ -1606,21 +1560,6 @@ export default function ProductsPage() {
     }
   };
 
-  // Handle payment success
-  const handlePaymentSuccess = async () => {
-    setCartItems([]);
-    setCart(new Set());
-    setShowCheckout(false);
-    
-    const response = await axios.post(`${API_BASE}/api/mail`, { actualUser });
-    if (response.data.success) {
-      alert('🎉 Order placed successfully! Check your email for confirmation.');
-    } else {
-      alert('Email not sent.');
-
-    }
-  };
-
   // Open product detail page
   const openProductDetail = (product: Product) => {
     console.log('👁️ Opening product detail page for:', product.id);
@@ -1958,6 +1897,13 @@ export default function ProductsPage() {
         </div>
       </div>
     );
+  };
+
+  // Only clear cart and close checkout on payment success
+  const handlePaymentSuccess = () => {
+    setCartItems([]);
+    setCart(new Set());
+    setShowCheckout(false);
   };
 
   // Show Product Detail Page if a product is selected

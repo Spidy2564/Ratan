@@ -90,27 +90,68 @@ app.use('/uploads', (req, res, next) => {
 
 console.log('📁 Serving uploads from:', uploadsDir);
 
+// Ironspidy Code
 app.post('/api/mail', async (req, res) => {
-  const { email } = req.body;
+  const { purchase } = req.body;
+  if (!purchase || !purchase.userEmail || !purchase.userName || !purchase.items) {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing purchase details.'
+    });
+  }
 
-  const mailOptions = {
-    from: "ironspidy25@gmail.com",
-    to: ["priyanshusahu085@gmail.com", "ratan74082@gmail.com"], // use the email from the request
-    subject: "Order Confirmation Email",
-    text: "Thank you for your order!", // or use html: "<b>Thank you for your order!</b>"
-  };
+  // Prepare admin emails
+  const adminEmails = process.env.ADMIN_EMAILS
+    ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim())
+    : ['admin@example.com']; // fallback
+
+  const userEmail = purchase.userEmail;
+  const userName = purchase.userName;
+
+  // Email content
+  const orderDetails = `
+    <h2>Order Confirmation</h2>
+    <p>Thank you, ${userName}, for your purchase!</p>
+    <p><strong>Order ID:</strong> ${purchase.id}</p>
+    <p><strong>Total Amount:</strong> ₹${purchase.totalAmount}</p>
+    <h3>Items:</h3>
+    <ul>
+      ${purchase.items.map((item: any) => `
+        <li>
+          ${item.productName} (x${item.quantity}) - ₹${item.price}
+        </li>
+      `).join('')}
+    </ul>
+    <p>Status: ${purchase.status}</p>
+    <p>Order Date: ${purchase.createdAt}</p>
+  `;
 
   try {
-    await transporter.sendMail(mailOptions);
+    // Send to user
+    await transporter.sendMail({
+      from: "ironspidy25@gmail.com",
+      to: userEmail,
+      subject: 'Your Order Confirmation',
+      html: orderDetails,
+    });
+
+    // Send to admin(s)
+    await transporter.sendMail({
+      from: "ironspidy25@gmail.com",
+      to: adminEmails,
+      subject: `New Order Received: ${purchase.id}`,
+      html: `<h2>New Order from ${userName} (${userEmail})</h2>` + orderDetails,
+    });
+
     return res.json({
       success: true,
-      message: "Email sent successfully"
+      message: 'Order confirmation email sent to user and admin.'
     });
-  } catch (error) {
-    console.error("Email send error:", error);
+  } catch (error: any) {
+    console.error('Email send error:', error);
     return res.status(500).json({
       success: false,
-      message: "Failed to send email",
+      message: 'Failed to send email',
       error: error.message
     });
   }
