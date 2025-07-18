@@ -1,0 +1,48 @@
+/* Responsive optimizations for ANIME INDIA POD */
+
+/* Mobile-specific animations and transitions */
+@media (max-width: 768px) {
+  /* Improve animation performance */
+  .animated-text,
+  .animated-navbar li {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+  }
+  
+  /* Better touch response */
+  a, button, .interactive-element {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Fix spacing and alignment issues */
+  .py-20 {
+    padding-top: 3rem;
+    padding-bottom: 3rem;
+  }
+  
+  /* Improve text readability on mobile */
+  .text-outline-fix {
+    text-shadow: 0 0 1px rgba(255, 255, 255, 0.7);
+  }
+  
+  /* Better image loading on mobile */
+  img {
+    content-visibility: auto;
+  }
+  
+  /* Smoother interactions */
+  .hover-interaction:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Tablet-specific optimizations */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Add optimizations for tablets here */
+  .tablet-padding-fix {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}

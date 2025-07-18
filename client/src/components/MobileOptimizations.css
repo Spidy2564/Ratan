@@ -1,0 +1,19 @@
+/* MobileOptimizations.css */
+@media (max-width: 768px) {
+  .mobile-products-container {
+    padding: 0 1rem;
+  }
+  
+  .product-carousel-container {
+    margin: 0 -1rem;
+    padding: 1rem;
+  }
+  
+  .limited-edition-container {
+    scroll-snap-type: x mandatory;
+  }
+  
+  .limited-edition-container > * {
+    scroll-snap-align: start;
+  }
+}

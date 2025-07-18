@@ -1,0 +1,57 @@
+/* Animation Fix - Prevents animation reset on scroll */
+
+/* Custom animation container that prevents animation resets */
+.animation-container {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  perspective: 1000px;
+  -webkit-perspective: 1000px;
+}
+
+/* Force hardware acceleration and prevent animation reflow */
+.preserve-3d {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  will-change: transform;
+  isolation: isolate;
+  contain: layout style paint;
+  z-index: 1;
+  position: relative;
+}
+
+/* Alternative animation that won't reset on scroll */
+@keyframes continuousScroll {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+/* Apply continuous scrolling animation with fixed position */
+.continuous-scroll {
+  animation: continuousScroll 30s linear infinite;
+  display: inline-flex;
+  width: 200%;
+  position: relative;
+  z-index: 2;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* Resets for animation continuity */
+.reset-layer {
+  position: relative;
+  z-index: 1;
+  contain: layout style paint;
+}
+
+/* Pause animation on hover */
+.animation-container:hover .continuous-scroll {
+  animation-play-state: paused;
+}

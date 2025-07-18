@@ -1,0 +1,156 @@
+Build a React-based website for a Print on Demand brand called ANIME INDIA, with the following requirements:
+
+🖌️ Branding
+Logo: "ANIME" in Blood Red and "INDIA" in Black.
+
+Bold, modern font. Place logo on the top-left of the navbar.
+
+📌 Sitemap & Navigation (Responsive Navbar)
+Include the following navigation items:
+
+Home
+
+Products
+
+T-Shirts (Regular, Oversized, Polo)
+
+Phone Covers
+
+Plates
+
+Bottles
+
+Customize
+
+Contact Us
+
+🏠 Home Page
+Hero section with anime-inspired background or digital artwork.
+
+Headline: “Design Your Passion. Wear Your Fandom.”
+
+Call to Action button: Start Customizing
+
+👕 Product Showcase Section (under Hero)
+Show 4 to 5 sample T-shirt icons/mockups in a grid or carousel.
+
+Ensure diverse color and design representation (Anime styles).
+
+🔄 Hover Animation Requirement (IMPORTANT)
+On hovering over any product image:
+
+T-Shirts: Switch image to the back view of the shirt.
+
+Phone Covers, Plates, Bottles: Rotate or show image from a different angle.
+
+Animation should be smooth and responsive on both desktop and mobile (tap or swipe on mobile).
+
+💡 Why Choose Us?
+Section title: "Why Choose ANIME INDIA?"
+Include 4–5 features with icons:
+
+Premium fabric & printing
+
+High-resolution 3D mockups
+
+Global shipping
+
+Anime-focused community
+
+Multi-position design options
+
+🧑‍🎨 CUSTOMIZATION SECTION (NAVBAR > Customize)
+A full-featured customization interface where users can:
+
+1. Select T-Shirt Type
+Choose between:
+
+Regular
+
+Oversized
+
+Polo
+
+Select size and color
+
+2. Upload Design To:
+Front Side
+
+Back Side
+
+Left Sleeve
+
+Right Sleeve
+
+Neck Label
+
+3. Design Size Options
+A2, A3, A4, A5, A6 and smaller
+
+4. Upload Instructions + Disclaimer
+Show warning: “Please upload high-resolution PNG files with transparent backgrounds.”
+
+Display disclaimer: “By uploading, you confirm you own or have permission to use this design.”
+
+5. Anime Sample Designs
+Offer a selection of Anime-themed template designs for users to apply to:
+
+T-Shirts
+
+Phone Covers
+
+Plates
+
+Bottles
+
+6. 3D Mockup Preview
+Allow users to view a live 3D model of their customized product:
+
+Real-time updates based on user-uploaded design
+
+Full 360° rotation
+
+Accurate texture/material preview (cotton, plastic, ceramic, etc.)
+
+⭐ Customer Reviews
+Add 3–4 user testimonials with:
+
+Reviewer name
+
+Uploaded mockup preview image
+
+Quote/review text
+
+Star rating
+
+❓ FAQ Section
+Use an accordion layout. Sample questions:
+
+Can I use copyrighted anime characters?
+
+What materials are the shirts made from?
+
+How long does it take to deliver?
+
+Can I cancel after uploading my design?
+
+📞 Contact Us
+Contact form with:
+
+Name
+
+Email
+
+Order ID
+
+Message
+
+Ticket creation confirmation
+Also include support email and contact details.
+
+🔚 Footer
+Social media links (Instagram, YouTube, X)
+
+Links: Privacy Policy, Terms of Service
+
+Copyright © ANIME INDIA [Current Year]

@@ -1,0 +1,74 @@
+Please apply the following updates and improvements
+
+🔧 1. Fix: T-Shirt Mockup Not Working
+On the Customization page, the T-shirt 3D mockup preview is not rendering or interactive.
+
+Ensure the 3D viewer:
+
+Loads correctly
+
+Accepts uploaded designs for Front, Back, Sleeves, Neck
+
+Supports 360° rotation
+
+Displays uploaded image on the corresponding position in real-time
+
+🔤 2. Fix: ANIME INDIA Logo Spacing
+Currently “ANIMEINDIA” appears as a single word.
+
+It should be clearly styled as two separate words:
+
+ANIME (in Blood Red)
+
+INDIA (in Black)
+
+Add space or padding between the two words in the logo component.
+
+🌫️ 3. Top Navigation Bar (Styling Upgrade)
+Make the top Navbar translucent.
+
+As users scroll through the page, the navbar background color should dynamically reflect the color theme of the current section.
+
+For example: If the section is dark-themed, navbar should subtly darken; if it's light-themed, it should lighten while staying translucent.
+
+Ensure this transition is smooth and does not obstruct readability.
+
+🧩 4. Product Category Boxes (Visual Enhancement)
+Apply a slightly translucent background effect (e.g., rgba(255,255,255,0.85) or similar) to:
+
+All product category boxes (e.g., Regular T-Shirts card, Phone Covers, etc.)
+
+The description area within these cards/boxes should also inherit the translucency.
+
+Ensure the text inside remains clearly legible.
+
+🧠 5. "Why Choose ANIME INDIA" Section
+The highlight boxes (each with a pointer like “Premium Quality”, “Fast Shipping”, etc.) should:
+
+Have translucent backgrounds (same style as product cards)
+
+Retain sharp contrast between icons and background
+
+📬 6. Contact Us Form Box
+The form box for raising concerns or tickets should also:
+
+Have a light translucent effect
+
+Maintain visual consistency with other section cards
+
+Border and input fields should stay crisp and easy to interact with
+
+🦶 7. Footer Aesthetic Upgrade
+Make the footer more visually appealing while keeping it minimal and brand-aligned.
+
+Suggestions:
+
+Add clean horizontal dividers
+
+Include a stylized version of the ANIME INDIA logo
+
+Slight gradient or darkened translucent background
+
+Animated social icons or hover effects
+
+Make sure it’s responsive and matches the site's overall anime-inspired aesthetic
