@@ -2,6 +2,8 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import User from '../models/user.js';
+import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 
 const router = express.Router();
 
@@ -13,6 +15,47 @@ const generateToken = (userId, email, role) => {
     { expiresIn: '24h' }
   );
 };
+
+// Google OAuth setup
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google/callback`,
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    let user = await User.findOne({ provider: 'google', providerId: profile.id });
+    if (!user) {
+      // Create new user
+      user = new User({
+        provider: 'google',
+        providerId: profile.id,
+        email: profile.emails[0].value,
+        firstName: profile.name.givenName || '',
+        lastName: profile.name.familyName || '',
+        isEmailVerified: true,
+        avatar: profile.photos[0]?.value,
+      });
+      await user.save();
+    }
+    return done(null, user);
+  } catch (err) {
+    return done(err, null);
+  }
+}));
+
+// Google OAuth login route
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+// Google OAuth callback route
+router.get('/google/callback', passport.authenticate('google', { session: false, failureRedirect: '/' }), (req, res) => {
+  // Issue JWT and redirect to frontend with token
+  const user = req.user;
+  const token = generateToken(user._id, user.email, user.role);
+  // You can also send refreshToken if needed
+  // Redirect to frontend with token (e.g. /auth/callback?token=...)
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+});
 
 // @desc    Register user
 // @route   POST /api/auth/register

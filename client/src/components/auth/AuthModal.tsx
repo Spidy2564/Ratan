@@ -108,6 +108,17 @@ const AuthModal: React.FC<AuthModalProps> = ({
               onClose={handleClose}
             />
           )}
+          <div className="mt-6 flex flex-col gap-2">
+            <button
+              onClick={() => {
+                window.location.href = `${window.location.protocol}//${window.location.hostname}:5000/api/auth/google`;
+              }}
+              className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 rounded-lg py-2 px-4 text-gray-700 font-medium hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              <img src="https://upload.wikimedia.org/wikipedia/commons/4/4a/Logo_2013_Google.png" alt="Google" className="w-5 h-5" />
+              Sign in with Google
+            </button>
+          </div>
         </div>
       </div>
     </div>
