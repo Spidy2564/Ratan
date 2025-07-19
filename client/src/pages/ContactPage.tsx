@@ -1,40 +1,57 @@
 import React, { useState } from 'react';
 import { Mail, Phone, MapPin, MessageSquare, ArrowRight } from 'lucide-react';
+import axios from 'axios';
 
-// Mock form validation
-const validateForm = (data) => {
-  const errors = {};
-  
+interface ContactFormData {
+  name: string;
+  email: string;
+  orderNumber: string;
+  inquiryType: string;
+  message: string;
+}
+
+interface ContactFormErrors {
+  name?: string;
+  email?: string;
+  orderNumber?: string;
+  inquiryType?: string;
+  message?: string;
+  general?: string;
+}
+
+const validateForm = (data: ContactFormData): ContactFormErrors => {
+  const errors: ContactFormErrors = {};
+
   if (!data.name || data.name.length < 2) {
     errors.name = "Name must be at least 2 characters";
   }
-  
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!data.email || !emailRegex.test(data.email)) {
     errors.email = "Please enter a valid email address";
   }
-  
+
   if (!data.inquiryType) {
     errors.inquiryType = "Please select an inquiry type";
   }
-  
+
   if (!data.message || data.message.length < 10) {
     errors.message = "Message must be at least 10 characters";
   }
-  
+
   return errors;
 };
 
 export default function ContactForm() {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ContactFormData>({
     name: '',
     email: '',
     orderNumber: '',
     inquiryType: 'general',
     message: ''
   });
-  
-  const [errors, setErrors] = useState({});
+
+  const [errors, setErrors] = useState<ContactFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -44,7 +61,7 @@ export default function ContactForm() {
       ...prev,
       [name]: value
     }));
-    
+
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -55,37 +72,36 @@ export default function ContactForm() {
   };
 
   const handleSubmit = async () => {
-    
     const validationErrors = validateForm(formData);
-    
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       return;
     }
-    
     setIsSubmitting(true);
-    
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Show success message
-      setShowSuccess(true);
-      
-      // Reset form
-      setFormData({
-        name: '',
-        email: '',
-        orderNumber: '',
-        inquiryType: 'general',
-        message: ''
-      });
-      
-      // Hide success message after 3 seconds
-      setTimeout(() => setShowSuccess(false), 3000);
-      
-    } catch (error) {
+      // Send to backend using axios
+      const res = await axios.post('http://localhost:5000/api/contact', formData);
+      const data = res.data;
+      if (res.status === 200 && data.success) {
+        setShowSuccess(true);
+        setFormData({
+          name: '',
+          email: '',
+          orderNumber: '',
+          inquiryType: 'general',
+          message: ''
+        });
+        setTimeout(() => setShowSuccess(false), 3000);
+      } else {
+        setErrors({ general: data.message || 'Failed to send message.' });
+      }
+    } catch (error: any) {
       console.error('Error submitting form:', error);
+      if (error.response && error.response.data && error.response.data.message) {
+        setErrors({ general: error.response.data.message });
+      } else {
+        setErrors({ general: 'Failed to send message. Please try again later.' });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -123,15 +139,15 @@ export default function ContactForm() {
           <div>
             <div className="h-full bg-gray-900 text-white rounded-lg shadow-xl overflow-hidden relative">
               {/* Background Image */}
-              <div 
+              <div
                 className="absolute inset-0 opacity-20 bg-cover bg-center"
-                style={{ 
-                  backgroundImage: "url('data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1000 1000\"%3E%3Cpath d=\"M0,0h1000v1000H0V0z\" fill=\"%23000\"/>%3Cg fill=\"%23111\"%3E%3Cpath d=\"M100,200h800v100H100V200z\"/>%3Cpath d=\"M200,400h600v100H200V400z\"/>%3Cpath d=\"M150,600h700v100H150V600z\"/>%3C/g%3E%3C/svg%3E')" 
+                style={{
+                  backgroundImage: "url('data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1000 1000\"%3E%3Cpath d=\"M0,0h1000v1000H0V0z\" fill=\"%23000\"/>%3Cg fill=\"%23111\"%3E%3Cpath d=\"M100,200h800v100H100V200z\"/>%3Cpath d=\"M200,400h600v100H200V400z\"/>%3Cpath d=\"M150,600h700v100H150V600z\"/>%3C/g%3E%3C/svg%3E')"
                 }}
               />
-              
+
               <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/70"></div>
-              
+
               <div className="relative z-10 p-6">
                 <div className="mb-6">
                   <h2 className="text-xl font-bold">
@@ -142,7 +158,7 @@ export default function ContactForm() {
                     We aim to respond to all inquiries within 24 hours. 🚀
                   </p>
                 </div>
-                
+
                 <div className="space-y-6">
                   <div className="flex items-start space-x-3">
                     <Mail className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
@@ -151,7 +167,7 @@ export default function ContactForm() {
                       <p className="text-gray-300 text-sm">support@animeindiapod.com</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start space-x-3">
                     <Phone className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
                     <div>
@@ -160,7 +176,7 @@ export default function ContactForm() {
                       <p className="text-gray-400 text-xs mt-1">Mon-Fri 9 AM - 6 PM IST</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start space-x-3">
                     <MapPin className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
                     <div>
@@ -209,8 +225,11 @@ export default function ContactForm() {
                   </p>
                   <div className="h-1 w-20 bg-red-600 rounded-full mt-3"></div>
                 </div>
-                
+
                 <div className="space-y-6">
+                  {errors.general && (
+                    <div className="text-red-600 text-sm mb-2">{errors.general}</div>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-2">

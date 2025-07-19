@@ -105,6 +105,45 @@ console.log('📁 Serving uploads from:', uploadsDir);
 app.use('/api/auth', authRoutes);
 
 // ================================
+// 📧 CONTACT FORM ROUTE
+// ================================
+
+app.post('/api/contact', async (req, res) => {
+  const { name, email, orderNumber, inquiryType, message } = req.body;
+  if (!name || !email || !inquiryType || !message) {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing required fields.'
+    });
+  }
+
+  const supportEmail = process.env.SUPPORT_EMAIL || 'support@animeindiapod.com';
+  const subject = `Contact Form: ${inquiryType} from ${name}`;
+  const html = `
+    <h2>New Contact Inquiry</h2>
+    <p><strong>Name:</strong> ${name}</p>
+    <p><strong>Email:</strong> ${email}</p>
+    ${orderNumber ? `<p><strong>Order Number:</strong> ${orderNumber}</p>` : ''}
+    <p><strong>Inquiry Type:</strong> ${inquiryType}</p>
+    <p><strong>Message:</strong></p>
+    <p>${message.replace(/\n/g, '<br/>')}</p>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: email,
+      to: supportEmail,
+      subject,
+      html,
+    });
+    return res.json({ success: true, message: 'Message sent successfully.' });
+  } catch (error: any) {
+    console.error('Contact form email error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to send message.', error: error.message });
+  }
+});
+
+// ================================
 // 🛒 PURCHASE ROUTES
 // ================================
 
