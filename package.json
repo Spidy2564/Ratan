@@ -13,6 +13,7 @@
     "db:push": "drizzle-kit push",
     "test:api": "curl -X GET http://localhost:5000/api/health",
     "test:upload": "curl -X GET http://localhost:5000/api/upload/health",
+    "seed:users": "node server/scripts/seedUsers.js",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -55,6 +56,8 @@
     "@types/multer": "^2.0.0",
     "@types/react-helmet": "^6.1.11",
     "axios": "^1.10.0",
+    "bcryptjs": "^3.0.2",
+    "jsonwebtoken": "^9.0.2",
     "canvas-confetti": "^1.9.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -131,6 +134,8 @@
     "@types/react-dom": "^18.3.7",
     "@types/socket.io-client": "^3.0.0",
     "@types/ws": "^8.5.13",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/bcryptjs": "^2.4.6",
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
     "concurrently": "^8.2.2",

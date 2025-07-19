@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+
 const purchaseSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -6,8 +8,7 @@ const purchaseSchema = new mongoose.Schema({
   },
   items: [{
     productId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
+      type: String,
       required: true,
     },
     productName: String,
@@ -54,4 +55,4 @@ purchaseSchema.index({ userId: 1, createdAt: -1 });
 purchaseSchema.index({ status: 1 });
 purchaseSchema.index({ paymentId: 1 });
 
-module.exports = mongoose.model('Purchase', purchaseSchema);
+export default mongoose.model('Purchase', purchaseSchema);

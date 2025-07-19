@@ -1,252 +1,157 @@
-// ============================================================================
-// File: client/src/components/admin/AdminNotifications.tsx - FIXED VERSION
-// ============================================================================
+// admin/AdminNotifications.tsx
+import React, { useState, useEffect, useRef } from 'react';
+import { Bell, Package, User, Clock, DollarSign, X, Check } from 'lucide-react';
 
-import React, { useState, useEffect } from 'react';
-import { Bell, Package, User, Clock, DollarSign, X, Check, RefreshCw, Settings } from 'lucide-react';
+const API_BASE = `${window.location.protocol}//${window.location.hostname}:5000`;
 
-interface Notification {
+// Add notification type
+interface OrderItem {
+  productName: string;
+  quantity: number;
+  size?: string;
+}
+
+interface OrderInfo {
   id: string;
-  type: 'order' | 'alert' | 'info' | 'system';
+  totalAmount: number;
+  userName: string;
+  userEmail: string;
+  items: OrderItem[];
+}
+
+interface OrderNotification {
+  id: string;
+  type: string;
   title: string;
   message: string;
   timestamp: string;
   read: boolean;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  order?: {
-    id: string;
-    totalAmount: number;
-    userName: string;
-    userEmail: string;
-    items?: Array<{
-      productName: string;
-      quantity: number;
-      size?: string;
-    }>;
-  };
+  priority: 'critical' | 'high' | 'normal';
+  order: OrderInfo;
 }
 
 const AdminNotifications: React.FC = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isConnected, setIsConnected] = useState(false);
+  const [notifications, setNotifications] = useState<OrderNotification[]>([]);
+  const [isConnected, setIsConnected] = useState(true); // Always true for API
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [orderModal, setOrderModal] = useState<OrderInfo | null>(null); // For order details modal
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const prevNotifIds = useRef<string[]>([]);
 
-  // Simulate connection status
-  useEffect(() => {
-    // Simulate connection after 2 seconds
-    const timer = setTimeout(() => {
-      setIsConnected(true);
-      loadNotifications();
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Auto-refresh notifications
-  useEffect(() => {
-    if (!autoRefresh) return;
-
-    const interval = setInterval(() => {
-      loadNotifications();
-    }, 30000); // Refresh every 30 seconds
-
-    return () => clearInterval(interval);
-  }, [autoRefresh]);
-
-  const loadNotifications = () => {
+  // Fetch all real orders as notifications
+  const fetchOrderNotifications = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      // Load notifications from localStorage or simulate them
-      const savedNotifications = JSON.parse(localStorage.getItem('admin_notifications') || '[]');
-      
-      // If no saved notifications, create some demo ones
-      if (savedNotifications.length === 0) {
-        const demoNotifications = generateDemoNotifications();
-        setNotifications(demoNotifications);
-        localStorage.setItem('admin_notifications', JSON.stringify(demoNotifications));
-      } else {
-        setNotifications(savedNotifications);
-      }
-      
-      setLastUpdate(new Date().toLocaleTimeString());
-      console.log('🔔 Notifications loaded:', savedNotifications.length);
-    } catch (error) {
-      console.error('❌ Error loading notifications:', error);
-    }
-  };
-
-  const generateDemoNotifications = (): Notification[] => {
-    const now = new Date();
-    return [
-      {
-        id: 'notif_1',
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+      if (!token) throw new Error('No admin token found. Please login as admin.');
+      const response = await fetch(`${API_BASE}/api/purchases/admin/all`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const data = await response.json();
+      if (!data.success || !Array.isArray(data.data)) throw new Error(data.message || 'Failed to fetch orders');
+      // Convert each order to a notification object
+      const orderNotifs: OrderNotification[] = data.data.map((order: any) => ({
+        id: order._id,
         type: 'order',
         title: 'New Order Received',
-        message: 'Order #12345 for ₹1599 from John Doe',
-        timestamp: new Date(now.getTime() - 5 * 60000).toISOString(), // 5 minutes ago
+        message: `Order #${order._id} for ₹${order.totalAmount} from ${order.userId?.firstName || ''} ${order.userId?.lastName || ''}`.trim(),
+        timestamp: order.createdAt,
         read: false,
         priority: 'high',
         order: {
-          id: '12345',
-          totalAmount: 1599,
-          userName: 'John Doe',
-          userEmail: 'john@example.com',
-          items: [
-            { productName: 'Naruto T-Shirt', quantity: 1, size: 'L' },
-            { productName: 'Anime Hoodie', quantity: 1, size: 'M' }
-          ]
+          id: order._id,
+          totalAmount: order.totalAmount,
+          userName: order.userId?.firstName && order.userId?.lastName ? `${order.userId.firstName} ${order.userId.lastName}` : order.userId?.email || 'Unknown',
+          userEmail: order.userId?.email || 'Unknown',
+          items: (order.items || []).map((item: any) => ({
+            productName: item.productName,
+            quantity: item.quantity,
+            size: item.size
+          }))
         }
-      },
-      {
-        id: 'notif_2',
-        type: 'alert',
-        title: 'Low Stock Alert',
-        message: 'Naruto T-Shirt (Size L) is running low on stock',
-        timestamp: new Date(now.getTime() - 15 * 60000).toISOString(), // 15 minutes ago
-        read: false,
-        priority: 'medium'
-      },
-      {
-        id: 'notif_3',
-        type: 'order',
-        title: 'Order Completed',
-        message: 'Order #12344 has been successfully processed',
-        timestamp: new Date(now.getTime() - 30 * 60000).toISOString(), // 30 minutes ago
-        read: true,
-        priority: 'low',
-        order: {
-          id: '12344',
-          totalAmount: 799,
-          userName: 'Jane Smith',
-          userEmail: 'jane@example.com',
-          items: [
-            { productName: 'Dragon Ball Phone Cover', quantity: 1 }
-          ]
+      }));
+      // Play sound if new notification arrives
+      const newIds = orderNotifs.map(n => n.id);
+      const prevIds = prevNotifIds.current;
+      if (soundEnabled && audioRef.current && prevIds.length > 0) {
+        // Play sound if there are new notifications
+        const newNotif = newIds.find(id => !prevIds.includes(id));
+        if (newNotif) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play();
         }
-      },
-      {
-        id: 'notif_4',
-        type: 'system',
-        title: 'System Update',
-        message: 'Admin dashboard has been updated with new features',
-        timestamp: new Date(now.getTime() - 60 * 60000).toISOString(), // 1 hour ago
-        read: true,
-        priority: 'low'
       }
-    ];
-  };
-
-  const playNotificationSound = () => {
-    if (soundEnabled) {
-      // Create a simple beep sound
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.value = 800;
-      oscillator.type = 'sine';
-      
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-      
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.1);
+      prevNotifIds.current = newIds;
+      setNotifications(orderNotifs);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load notifications');
+      setNotifications([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const showBrowserNotification = (notification: Notification) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(notification.title, {
-        body: notification.message,
-        icon: '/admin-icon.png',
-        tag: notification.id
-      });
-    }
-  };
-
-  const requestNotificationPermission = async () => {
-    if ('Notification' in window) {
-      const permission = await Notification.requestPermission();
-      console.log('Notification permission:', permission);
-      
-      if (permission === 'granted') {
-        alert('Browser notifications enabled!');
-      } else {
-        alert('Browser notifications denied. You can enable them in your browser settings.');
-      }
-    } else {
-      alert('Browser notifications not supported in this browser.');
-    }
-  };
+  useEffect(() => {
+    fetchOrderNotifications();
+    // Optionally, poll every 30s for new orders
+    const interval = setInterval(fetchOrderNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [soundEnabled]);
 
   const markAsRead = (notificationId: string) => {
-    const updatedNotifications = notifications.map(notif => 
-      notif.id === notificationId 
-        ? { ...notif, read: true }
-        : notif
-    );
-    setNotifications(updatedNotifications);
-    localStorage.setItem('admin_notifications', JSON.stringify(updatedNotifications));
+    setNotifications(prev => prev.map(notif => notif.id === notificationId ? { ...notif, read: true } : notif));
   };
 
   const dismissNotification = (notificationId: string) => {
-    const updatedNotifications = notifications.filter(notif => notif.id !== notificationId);
-    setNotifications(updatedNotifications);
-    localStorage.setItem('admin_notifications', JSON.stringify(updatedNotifications));
+    setNotifications(prev => prev.filter(notif => notif.id !== notificationId));
   };
 
-  const markAllAsRead = () => {
-    const updatedNotifications = notifications.map(notif => ({ ...notif, read: true }));
-    setNotifications(updatedNotifications);
-    localStorage.setItem('admin_notifications', JSON.stringify(updatedNotifications));
-  };
-
-  const clearAllNotifications = () => {
-    if (confirm('Are you sure you want to clear all notifications?')) {
-      setNotifications([]);
-      localStorage.removeItem('admin_notifications');
+  // Process Order: update status to 'processing'
+  const handleProcessOrder = async (orderId: string) => {
+    try {
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+      if (!token) throw new Error('No admin token found. Please login as admin.');
+      const response = await fetch(`${API_BASE}/api/purchases/${orderId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'processing' })
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const data = await response.json();
+      if (!data.success) throw new Error(data.message || 'Failed to update status');
+      alert('Order status updated to Processing!');
+      fetchOrderNotifications();
+    } catch (err: any) {
+      alert(err.message || 'Failed to process order');
     }
   };
 
-  const addTestNotification = () => {
-    const testNotification: Notification = {
-      id: `test_${Date.now()}`,
-      type: 'order',
-      title: 'Test Notification',
-      message: `Test notification created at ${new Date().toLocaleTimeString()}`,
-      timestamp: new Date().toISOString(),
-      read: false,
-      priority: 'medium',
-      order: {
-        id: `TEST_${Date.now()}`,
-        totalAmount: 1299,
-        userName: 'Test Customer',
-        userEmail: 'test@example.com',
-        items: [
-          { productName: 'Test Product', quantity: 1, size: 'M' }
-        ]
-      }
-    };
-
-    const updatedNotifications = [testNotification, ...notifications];
-    setNotifications(updatedNotifications);
-    localStorage.setItem('admin_notifications', JSON.stringify(updatedNotifications));
-    
-    if (soundEnabled) {
-      playNotificationSound();
-    }
-    showBrowserNotification(testNotification);
+  // Contact Customer: open mailto link
+  const handleContactCustomer = (email: string) => {
+    window.open(`mailto:${email}?subject=Regarding your order&body=Hello,`, '_blank');
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-  const criticalCount = notifications.filter(n => n.priority === 'critical' && !n.read).length;
+  // View Order: show modal with order details
+  const handleViewOrder = (order: OrderInfo) => {
+    setOrderModal(order);
+  };
+
+  const closeOrderModal = () => setOrderModal(null);
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-6">
+      {/* Notification sound */}
+      <audio ref={audioRef} src="/notification.mp3" preload="auto" style={{ display: 'none' }} />
       {/* Header */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <div className="flex items-center justify-between">
@@ -255,235 +160,99 @@ const AdminNotifications: React.FC = () => {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Admin Notifications</h1>
               <p className="text-gray-600">Real-time order alerts and system notifications</p>
-              {unreadCount > 0 && (
-                <p className="text-sm text-orange-600 font-medium">
-                  {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
-                  {criticalCount > 0 && ` (${criticalCount} critical)`}
-                </p>
-              )}
             </div>
           </div>
-          
-          <div className="flex items-center gap-3">
-            {/* Connection Status */}
-            <div className={`flex items-center px-3 py-1 rounded-full text-sm ${
-              isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-            }`}>
-              <div className={`w-2 h-2 rounded-full mr-2 ${
-                isConnected ? 'bg-green-500' : 'bg-red-500'
-              }`}></div>
-              {isConnected ? 'Connected' : 'Connecting...'}
+          <div className="flex items-center gap-4">
+            <div className={`flex items-center px-3 py-1 rounded-full text-sm ${isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+              <div className={`w-2 h-2 rounded-full mr-2 ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              {isConnected ? 'Connected' : 'Disconnected'}
             </div>
-
-            {/* Settings */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className={`px-3 py-1 rounded-full text-sm ${
-                  soundEnabled ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'
-                }`}
-                title={soundEnabled ? 'Disable sound' : 'Enable sound'}
-              >
-                🔊 {soundEnabled ? 'On' : 'Off'}
-              </button>
-
-              <button
-                onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`px-3 py-1 rounded-full text-sm ${
-                  autoRefresh ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                }`}
-                title={autoRefresh ? 'Disable auto-refresh' : 'Enable auto-refresh'}
-              >
-                <RefreshCw className={`w-3 h-3 inline mr-1 ${autoRefresh ? 'animate-spin' : ''}`} />
-                Auto
-              </button>
-            </div>
-
-            {/* Action Buttons */}
             <button
-              onClick={requestNotificationPermission}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
+              onClick={fetchOrderNotifications}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              disabled={loading}
             >
-              Enable Browser Notifications
+              {loading ? 'Loading...' : 'Refresh'}
             </button>
-
             <button
-              onClick={addTestNotification}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className={`px-3 py-1 rounded-full text-sm ${soundEnabled ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-600'}`}
             >
-              Test Notification
-            </button>
-
-            <button
-              onClick={loadNotifications}
-              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm"
-            >
-              <RefreshCw className="w-4 h-4 inline mr-1" />
-              Refresh
+              🔊 {soundEnabled ? 'Sound On' : 'Sound Off'}
             </button>
           </div>
         </div>
-
-        {/* Bulk Actions */}
-        {notifications.length > 0 && (
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-            <div className="text-sm text-gray-600">
-              Last updated: {lastUpdate || 'Never'}
-            </div>
-            <div className="flex gap-2">
-              {unreadCount > 0 && (
-                <button
-                  onClick={markAllAsRead}
-                  className="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded"
-                >
-                  Mark All Read
-                </button>
-              )}
-              <button
-                onClick={clearAllNotifications}
-                className="text-sm bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded"
-              >
-                Clear All
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Notifications List */}
       <div className="space-y-4">
-        {notifications.length === 0 ? (
+        {error && (
+          <div className="bg-red-100 text-red-700 p-4 rounded-lg text-center mb-4">{error}</div>
+        )}
+        {notifications.length === 0 && !loading ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <Bell className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No notifications yet</h3>
-            <p className="text-gray-600 mb-4">You'll see order notifications here when they arrive.</p>
-            <button
-              onClick={addTestNotification}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-            >
-              Create Test Notification
-            </button>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No order notifications yet</h3>
+            <p className="text-gray-600">You'll see order notifications here when they arrive.</p>
           </div>
         ) : (
           notifications.map((notification) => (
             <div
               key={notification.id}
-              className={`bg-white rounded-lg shadow-md p-6 border-l-4 transition-all ${
-                notification.read ? 'border-gray-300 opacity-75' : 
-                notification.priority === 'critical' ? 'border-red-500 shadow-lg' :
-                notification.priority === 'high' ? 'border-orange-500' :
-                'border-blue-500'
-              }`}
+              className={`bg-white rounded-lg shadow-md p-6 border-l-4 ${notification.read ? 'border-gray-300' : 'border-blue-500'}`}
             >
               <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-4 flex-1">
-                  <div className={`p-3 rounded-full ${
-                    notification.priority === 'critical' ? 'bg-red-100' :
-                    notification.priority === 'high' ? 'bg-orange-100' :
-                    notification.priority === 'medium' ? 'bg-yellow-100' :
-                    'bg-blue-100'
-                  }`}>
-                    {notification.type === 'order' ? (
-                      <Package className={`w-6 h-6 ${
-                        notification.priority === 'critical' ? 'text-red-600' :
-                        notification.priority === 'high' ? 'text-orange-600' :
-                        notification.priority === 'medium' ? 'text-yellow-600' :
-                        'text-blue-600'
-                      }`} />
-                    ) : notification.type === 'system' ? (
-                      <Settings className={`w-6 h-6 ${
-                        notification.priority === 'critical' ? 'text-red-600' :
-                        notification.priority === 'high' ? 'text-orange-600' :
-                        notification.priority === 'medium' ? 'text-yellow-600' :
-                        'text-blue-600'
-                      }`} />
-                    ) : (
-                      <Bell className={`w-6 h-6 ${
-                        notification.priority === 'critical' ? 'text-red-600' :
-                        notification.priority === 'high' ? 'text-orange-600' :
-                        notification.priority === 'medium' ? 'text-yellow-600' :
-                        'text-blue-600'
-                      }`} />
-                    )}
+                <div className="flex items-start space-x-4">
+                  <div className={`p-3 rounded-full ${notification.priority === 'critical' ? 'bg-red-100' : notification.priority === 'high' ? 'bg-orange-100' : 'bg-blue-100'}`}>
+                    <Package className={`w-6 h-6 ${notification.priority === 'critical' ? 'text-red-600' : notification.priority === 'high' ? 'text-orange-600' : 'text-blue-600'}`} />
                   </div>
-                  
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-2">
                       <h3 className="text-lg font-semibold text-gray-900">
-                        {notification.title}
+                        New Order #{notification.order.id}
                       </h3>
                       {notification.priority === 'critical' && (
-                        <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium">
-                          🚨 CRITICAL
-                        </span>
-                      )}
-                      {notification.priority === 'high' && (
-                        <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-xs font-medium">
-                          ⚠️ HIGH
-                        </span>
-                      )}
-                      {!notification.read && (
-                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
-                          NEW
-                        </span>
+                        <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium">🚨 URGENT</span>
                       )}
                     </div>
-                    
-                    <p className="text-gray-600 mb-3">{notification.message}</p>
-
-                    {/* Order Details */}
-                    {notification.order && (
-                      <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                        <h4 className="font-medium text-gray-900 mb-2">Order Details:</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-                          <div className="flex items-center text-sm text-gray-600">
-                            <User className="w-4 h-4 mr-2" />
-                            {notification.order.userName}
-                          </div>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <DollarSign className="w-4 h-4 mr-2" />
-                            ₹{notification.order.totalAmount}
-                          </div>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Package className="w-4 h-4 mr-2" />
-                            {notification.order.items?.length || 0} items
-                          </div>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Clock className="w-4 h-4 mr-2" />
-                            {new Date(notification.timestamp).toLocaleTimeString()}
-                          </div>
-                        </div>
-
-                        {notification.order.items && (
-                          <div>
-                            <h5 className="font-medium text-gray-900 mb-1">Items:</h5>
-                            {notification.order.items.map((item, index) => (
-                              <div key={index} className="text-sm text-gray-600">
-                                {item.productName} {item.size && `(${item.size})`} × {item.quantity}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <User className="w-4 h-4 mr-2" />
+                        {notification.order.userName}
                       </div>
-                    )}
-
-                    <div className="text-sm text-gray-500">
-                      {new Date(notification.timestamp).toLocaleString()}
+                      <div className="flex items-center text-sm text-gray-600">
+                        <DollarSign className="w-4 h-4 mr-2" />
+                        ₹{notification.order.totalAmount}
+                      </div>
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Package className="w-4 h-4 mr-2" />
+                        {notification.order.items?.length || 0} items
+                      </div>
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Clock className="w-4 h-4 mr-2" />
+                        {new Date(notification.timestamp).toLocaleTimeString()}
+                      </div>
+                    </div>
+                    {/* Order Items */}
+                    <div className="bg-gray-50 p-3 rounded-lg mb-4">
+                      <h4 className="font-medium text-gray-900 mb-2">Items:</h4>
+                      {notification.order.items?.map((item, index) => (
+                        <div key={index} className="text-sm text-gray-600">
+                          {item.productName} {item.size && `(${item.size})`} × {item.quantity}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
-
                 {/* Action Buttons */}
                 <div className="flex items-center space-x-2">
-                  {!notification.read && (
-                    <button
-                      onClick={() => markAsRead(notification.id)}
-                      className="p-2 text-green-600 hover:bg-green-100 rounded-lg"
-                      title="Mark as read"
-                    >
-                      <Check className="w-4 h-4" />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => markAsRead(notification.id)}
+                    className="p-2 text-green-600 hover:bg-green-100 rounded-lg"
+                    title="Mark as read"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
                   <button
                     onClick={() => dismissNotification(notification.id)}
                     className="p-2 text-red-600 hover:bg-red-100 rounded-lg"
@@ -493,25 +262,55 @@ const AdminNotifications: React.FC = () => {
                   </button>
                 </div>
               </div>
-
-              {/* Quick Actions for Orders */}
-              {notification.order && notification.type === 'order' && (
-                <div className="flex items-center space-x-3 mt-4 pt-4 border-t border-gray-200">
-                  <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
-                    View Order
-                  </button>
-                  <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
-                    Process Order
-                  </button>
-                  <button className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 text-sm">
-                    Contact Customer
-                  </button>
-                </div>
-              )}
+              {/* Quick Actions */}
+              <div className="flex items-center space-x-3 mt-4 pt-4 border-t border-gray-200">
+                <button
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
+                  onClick={() => handleViewOrder(notification.order)}
+                >
+                  View Order
+                </button>
+                <button
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm"
+                  onClick={() => handleProcessOrder(notification.order.id)}
+                >
+                  Process Order
+                </button>
+                <button
+                  className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 text-sm"
+                  onClick={() => handleContactCustomer(notification.order.userEmail)}
+                >
+                  Contact Customer
+                </button>
+              </div>
             </div>
           ))
         )}
       </div>
+
+      {/* Order Details Modal */}
+      {orderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-8 max-w-lg w-full relative">
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              onClick={closeOrderModal}
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <h2 className="text-2xl font-bold mb-4">Order #{orderModal.id}</h2>
+            <div className="mb-2"><strong>Customer:</strong> {orderModal.userName}</div>
+            <div className="mb-2"><strong>Email:</strong> {orderModal.userEmail}</div>
+            <div className="mb-2"><strong>Total Amount:</strong> ₹{orderModal.totalAmount}</div>
+            <div className="mb-2"><strong>Items:</strong></div>
+            <ul className="list-disc pl-6">
+              {orderModal.items.map((item, idx) => (
+                <li key={idx}>{item.productName} {item.size && `(${item.size})`} × {item.quantity}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

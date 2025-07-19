@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+import jwt from 'jsonwebtoken';
+import User from '../models/user.js';
 
 const protect = async (req, res, next) => {
   try {
@@ -10,6 +10,7 @@ const protect = async (req, res, next) => {
     }
 
     if (!token) {
+      console.log('❌ Auth middleware - No token provided');
       return res.status(401).json({
         success: false,
         message: 'Access denied. No token provided.',
@@ -17,7 +18,7 @@ const protect = async (req, res, next) => {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
       const user = await User.findById(decoded.id).select('-password -refreshTokens');
       
       if (!user || !user.isActive) {
@@ -55,4 +56,4 @@ const authorize = (...roles) => {
   };
 };
 
-module.exports = { protect, authorize };
+export { protect, authorize };

@@ -1,6 +1,6 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -15,7 +15,6 @@ const userSchema = new mongoose.Schema({
     required: function() {
       return this.provider === 'email';
     },
-    minlength: 8,
   },
   firstName: {
     type: String,
@@ -112,11 +111,11 @@ userSchema.methods.generateTokens = function() {
     role: this.role,
   };
 
-  const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
+  const accessToken = jwt.sign(payload, process.env.JWT_SECRET || 'your-secret-key', {
     expiresIn: process.env.JWT_EXPIRE || '1h',
   });
 
-  const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
+  const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET || 'your-refresh-secret', {
     expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d',
   });
 
@@ -127,7 +126,7 @@ userSchema.methods.generateTokens = function() {
 userSchema.methods.generateEmailVerificationToken = function() {
   const token = jwt.sign(
     { id: this._id, email: this.email },
-    process.env.JWT_SECRET,
+    process.env.JWT_SECRET || 'your-secret-key',
     { expiresIn: '1d' }
   );
   
@@ -141,7 +140,7 @@ userSchema.methods.generateEmailVerificationToken = function() {
 userSchema.methods.generatePasswordResetToken = function() {
   const token = jwt.sign(
     { id: this._id, email: this.email },
-    process.env.JWT_SECRET,
+    process.env.JWT_SECRET || 'your-secret-key',
     { expiresIn: '1h' }
   );
   
@@ -155,7 +154,7 @@ userSchema.methods.generatePasswordResetToken = function() {
 userSchema.methods.cleanExpiredTokens = function() {
   this.refreshTokens = this.refreshTokens.filter(token => {
     try {
-      jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+      jwt.verify(token, process.env.JWT_REFRESH_SECRET || 'your-refresh-secret');
       return true;
     } catch (error) {
       return false;
@@ -163,4 +162,4 @@ userSchema.methods.cleanExpiredTokens = function() {
   });
 };
 
-module.exports = mongoose.model('User', userSchema);
+export default mongoose.model('User', userSchema);

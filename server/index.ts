@@ -16,6 +16,14 @@ import { dirname } from 'path';
 import fs from 'fs';
 import { protect } from './middleware/auth.js';
 
+// Import routes
+import authRoutes from './routes/auth.js';
+import purchaseRoutes from './routes/purchases.js';
+
+// Import models to ensure they are registered with mongoose
+import './models/user.js';
+import './models/Purchase.js';
+
 // Get __dirname equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -90,6 +98,18 @@ app.use('/uploads', (req, res, next) => {
 
 console.log('📁 Serving uploads from:', uploadsDir);
 
+// ================================
+// 🔐 AUTH ROUTES
+// ================================
+
+app.use('/api/auth', authRoutes);
+
+// ================================
+// 🛒 PURCHASE ROUTES
+// ================================
+
+app.use('/api/purchases', purchaseRoutes);
+
 // Ironspidy Code
 app.post('/api/mail', async (req, res) => {
   const { purchase } = req.body;
@@ -158,7 +178,7 @@ app.post('/api/mail', async (req, res) => {
 });
 
 // ================================
-// 🗃️ DATABASE CONNECTION (OPTIONAL)
+// 🗃️ DATABASE CONNECTION
 // ================================
 
 const connectDB = async (): Promise<void> => {
@@ -166,24 +186,95 @@ const connectDB = async (): Promise<void> => {
     if (process.env.MONGODB_URI) {
       const conn = await mongoose.connect(process.env.MONGODB_URI);
       console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+
+            // Create default admin user if it doesn't exist
+      const User = mongoose.model('User');
+      const adminUser = await User.findOne({ email: 'admin@tshirtapp.com' });
+      
+      if (!adminUser) {
+        const newAdmin = new User({
+          email: 'admin@tshirtapp.com',
+          firstName: 'Admin',
+          lastName: 'User',
+          password: 'admin123', // Let the pre-save hook hash it
+          role: 'admin',
+          isEmailVerified: true,
+          isActive: true,
+        });
+        
+        await newAdmin.save();
+        console.log('✅ Default admin user created');
+      }
+
+            // Create default superadmin user if it doesn't exist
+      const superAdminUser = await User.findOne({ email: 'superadmin@tshirtapp.com' });
+      
+      if (!superAdminUser) {
+        const newSuperAdmin = new User({
+          email: 'superadmin@tshirtapp.com',
+          firstName: 'Super',
+          lastName: 'Admin',
+          password: 'super123', // Let the pre-save hook hash it
+          role: 'superadmin',
+          isEmailVerified: true,
+          isActive: true,
+        });
+        
+        await newSuperAdmin.save();
+        console.log('✅ Default superadmin user created');
+      }
+
+            // Create default test user if it doesn't exist
+      const testUser = await User.findOne({ email: 'user@test.com' });
+      
+      if (!testUser) {
+        const newTestUser = new User({
+          email: 'user@test.com',
+          firstName: 'Test',
+          lastName: 'User',
+          password: 'user123', // Let the pre-save hook hash it
+          role: 'user',
+          isEmailVerified: true,
+          isActive: true,
+        });
+        
+        await newTestUser.save();
+        console.log('✅ Default test user created');
+      }
+
     } else {
       console.log('⚠️ No MongoDB URI provided - running with in-memory data');
     }
   } catch (error) {
     console.log('⚠️ Database connection failed - continuing with in-memory data');
+    console.error('Database error:', error);
   }
 };
 
-// ✅ FIXED: Don't fail on database connection
-connectDB().catch(() => {
-  console.log('📝 Continuing without database - using in-memory storage');
-});
+// Connect to database
+connectDB();
 
 // ================================
 // 🗄️ SAMPLE DATA
 // ================================
 
-let sampleProducts = [
+// Define the product type
+interface Product {
+  id: number;
+  name: string;
+  description: string;
+  price: string;
+  category: string;
+  inStock: boolean;
+  featured: boolean;
+  images: string | null;
+  imageUrl: string;
+  tags: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+let sampleProducts: Product[] = [
   {
     id: 1,
     name: 'Naruto Uzumaki Orange T-Shirt',
@@ -399,7 +490,7 @@ app.post('/api/products', (req, res) => {
       description: description.trim(),
       price: parseFloat(price).toFixed(0),
       category,
-      images: productImages,
+      images: productImages as any, // Fix type issue
       imageUrl: mainImageUrl,
       inStock: inStock !== false,
       featured: featured || false,
@@ -416,12 +507,12 @@ app.post('/api/products', (req, res) => {
       data: newProduct
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('❌ Product creation error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create product',
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
@@ -431,7 +522,7 @@ app.put('/api/products/:id', (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
 
-    const productIndex = sampleProducts.findIndex(p => p.id == id);
+    const productIndex = sampleProducts.findIndex(p => p.id === parseInt(id));
 
     if (productIndex === -1) {
       return res.status(404).json({
@@ -455,7 +546,7 @@ app.put('/api/products/:id', (req, res) => {
       data: updatedProduct
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Product update error:', error);
     res.status(500).json({
       success: false,
@@ -469,7 +560,7 @@ app.delete('/api/products/:id', (req, res) => {
   try {
     const { id } = req.params;
 
-    const productIndex = sampleProducts.findIndex(p => p.id == id);
+    const productIndex = sampleProducts.findIndex(p => p.id === parseInt(id));
 
     if (productIndex === -1) {
       return res.status(404).json({
@@ -489,7 +580,7 @@ app.delete('/api/products/:id', (req, res) => {
       }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Product deletion error:', error);
     res.status(500).json({
       success: false,
@@ -553,11 +644,11 @@ app.post('/api/upload', (req, res) => {
       fileSize: fs.statSync(filePath).size
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Upload error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to upload image'
+      error: error.message
     });
   }
 });
@@ -595,7 +686,7 @@ app.post('/api/orders', async (req, res) => {
       notificationSent: true // Placeholder, as notificationService is removed
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Order creation error:', error);
     res.status(500).json({
       success: false,
@@ -720,10 +811,10 @@ app.get('/api/upload/list', (req, res) => {
       uploadsDir
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });

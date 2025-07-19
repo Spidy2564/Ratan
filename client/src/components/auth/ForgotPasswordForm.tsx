@@ -31,7 +31,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
       await forgotPassword(email);
       setIsSuccess(true);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Failed to send reset email');
     } finally {
       setIsLoading(false);
     }
@@ -50,7 +50,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
 
         <div className="bg-blue-50 p-4 rounded-lg mb-6">
           <p className="text-blue-800 text-sm">
-            The reset link will expire in 10 minutes for security. 
+            The reset link will expire in 1 hour for security. 
             Don't forget to check your spam folder!
           </p>
         </div>
@@ -82,7 +82,7 @@ export const ForgotPasswordForm: React.FC<ForgotPasswordFormProps> = ({
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-            Email Address
+            Email Address *
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

@@ -4,13 +4,13 @@ import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'customer' | 'admin' | 'super-admin';
+  requiredRole?: 'user' | 'admin' | 'superadmin';
   fallback?: React.ReactNode;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
-  requiredRole = 'customer',
+  requiredRole = 'user',
   fallback,
 }) => {
   const { state } = useAuth();
@@ -45,12 +45,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // Check role-based access
   const hasRequiredRole = () => {
     const roleHierarchy = {
-      'customer': 1,
+      'user': 1,
       'admin': 2,
-      'super-admin': 3,
+      'superadmin': 3,
     };
 
-    const userLevel = roleHierarchy[state.user.role];
+    const userLevel = roleHierarchy[state.user?.role || 'user'];
     const requiredLevel = roleHierarchy[requiredRole];
 
     return userLevel >= requiredLevel;
@@ -63,6 +63,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Insufficient Permissions</h2>
           <p className="text-gray-600 mb-6">
             You don't have permission to access this page. Required role: {requiredRole}
+          </p>
+          <p className="text-sm text-gray-500">
+            Your current role: {state.user?.role || 'user'}
           </p>
         </div>
       </div>

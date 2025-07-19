@@ -38,43 +38,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     setIsLoading(true);
 
     try {
-      // Simple mock login - replace with your actual login logic
-      if (formData.email === 'admin@tshirtapp.com' && formData.password === 'admin123') {
-        const adminUser = {
-          id: 'admin_001',
-          email: 'admin@tshirtapp.com',
-          firstName: 'Admin',
-          lastName: 'User',
-          name: 'Admin User',
-          role: 'admin'
-        };
-        localStorage.setItem('current_user', JSON.stringify(adminUser));
-        console.log('✅ Admin login successful');
-        
-        // Trigger a page reload to update auth state
-        window.location.reload();
-        return;
-      } 
+      await login(formData.email, formData.password, formData.rememberMe);
+      console.log('✅ Login successful');
       
-      if (formData.email === 'user@test.com' && formData.password === 'user123') {
-        const testUser = {
-          id: 'user_001',
-          email: 'user@test.com',
-          firstName: 'Test',
-          lastName: 'User',
-          name: 'Test User',
-          role: 'user'
-        };
-        localStorage.setItem('current_user', JSON.stringify(testUser));
-        console.log('✅ User login successful');
-        
-        // Trigger a page reload to update auth state
-        window.location.reload();
-        return;
-      }
-      
-      // If credentials don't match
-      throw new Error('Invalid email or password');
+      // The AuthContext will handle storing the user data
+      // No need to manually reload the page
       
     } catch (err: any) {
       console.error('❌ Login error:', err);
@@ -220,41 +188,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             </button>
           </p>
         </div>
-
-        {/* Quick Test Login Buttons - Development Only */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="border-t pt-4 mt-6">
-            <p className="text-xs text-gray-500 mb-3">Quick test logins:</p>
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setFormData({
-                    email: 'admin@tshirtapp.com',
-                    password: 'admin123',
-                    rememberMe: false
-                  });
-                }}
-                className="w-full text-left text-xs bg-green-50 hover:bg-green-100 text-green-700 p-2 rounded border"
-              >
-                👑 Fill Admin Credentials
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setFormData({
-                    email: 'user@test.com', 
-                    password: 'user123',
-                    rememberMe: false
-                  });
-                }}
-                className="w-full text-left text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 p-2 rounded border"
-              >
-                👤 Fill User Credentials
-              </button>
-            </div>
-          </div>
-        )}
       </form>
     </div>
   );

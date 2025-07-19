@@ -1086,41 +1086,118 @@ const CheckoutPage = ({
         alert('📦 Order placed! Pay on delivery.');
       }
 
-      // Save purchase to localStorage with size information
-      const purchase = {
-        id: `purchase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        userId: user?.id || 'guest',
-        userEmail: user?.email || userDetails.email,
-        userName: user?.name || userDetails.name,
+      // Create purchase data for MongoDB
+      const purchaseData = {
         items: cartItems.map(item => ({
-          id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           productId: item.product.id.toString(),
           productName: item.product.name,
           price: parseFloat(item.product.price),
           quantity: item.quantity,
-          size: item.size || null // Include size in purchase record
+          size: item.size || null,
+          color: null
         })),
         totalAmount: totalAmount,
-        status: 'completed',
-        createdAt: new Date().toISOString()
+        paymentMethod: paymentMethod,
+        paymentId: paymentMethod === 'razorpay' ? `pay_${Date.now()}` : null,
+        shippingAddress: {
+          name: userDetails.name,
+          email: userDetails.email,
+          phone: userDetails.phone,
+          street: userDetails.address,
+          city: userDetails.city,
+          state: userDetails.state,
+          zipCode: userDetails.pincode,
+          country: 'India'
+        },
+        orderNotes: ''
       };
 
-      const response = await axios.post(`${API_BASE}/api/mail`, { purchase });
-      if (response.data.success) {
-        alert('🎉 Order placed successfully! Check your email for confirmation.');
-      } else {
-        alert('Email not sent.');
+      // Save purchase to MongoDB
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+      console.log('🔐 Purchase - Token available:', !!token);
+      
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.');
       }
+      
+      const response = await axios.post(`${API_BASE}/api/purchases`, purchaseData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-      const existingPurchases = JSON.parse(localStorage.getItem('all_purchases') || '[]');
-      existingPurchases.push(purchase);
-      localStorage.setItem('all_purchases', JSON.stringify(existingPurchases));
+      if (response.data.success) {
+        console.log('✅ Purchase saved to MongoDB:', response.data.data);
+        
+        // Also save to localStorage for admin analytics
+        const purchase = {
+          id: response.data.data._id,
+          userId: user?.id || 'guest',
+          userEmail: user?.email || userDetails.email,
+          userName: user?.name || userDetails.name,
+          items: cartItems.map(item => ({
+            id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            productId: item.product.id.toString(),
+            productName: item.product.name,
+            price: parseFloat(item.product.price),
+            quantity: item.quantity,
+            size: item.size || null
+          })),
+          totalAmount: totalAmount,
+          status: 'pending',
+          createdAt: new Date().toISOString()
+        };
 
-      console.log('✅ Purchase saved to localStorage:', purchase);
+        // --- Add real order notification for admin ---
+        const adminNotif = {
+          id: `order_${purchase.id}`,
+          type: 'order',
+          title: 'New Order Received',
+          message: `Order #${purchase.id} for ₹${purchase.totalAmount} from ${purchase.userName}`,
+          timestamp: new Date().toISOString(),
+          read: false,
+          priority: 'high',
+          order: {
+            id: purchase.id,
+            totalAmount: purchase.totalAmount,
+            userName: purchase.userName,
+            userEmail: purchase.userEmail,
+            items: purchase.items.map((item: any) => ({
+              productName: item.productName,
+              quantity: item.quantity,
+              size: item.size
+            }))
+          }
+        };
+        const existingAdminNotifs = JSON.parse(localStorage.getItem('admin_notifications') || '[]');
+        localStorage.setItem('admin_notifications', JSON.stringify([adminNotif, ...existingAdminNotifs]));
+        // --- End notification code ---
 
-      onPaymentSuccess();
-    } catch (error) {
-      alert('❌ Payment failed. Please try again.');
+        const existingPurchases = JSON.parse(localStorage.getItem('all_purchases') || '[]');
+        existingPurchases.push(purchase);
+        localStorage.setItem('all_purchases', JSON.stringify(existingPurchases));
+
+        // Send email notification
+        try {
+          const emailResponse = await axios.post(`${API_BASE}/api/mail`, { purchase });
+          if (emailResponse.data.success) {
+            alert('🎉 Order placed successfully! Check your email for confirmation.');
+          } else {
+            alert('Order placed successfully! Email notification failed.');
+          }
+        } catch (emailError) {
+          console.error('Email notification failed:', emailError);
+          alert('Order placed successfully! Email notification failed.');
+        }
+
+        onPaymentSuccess();
+      } else {
+        throw new Error('Failed to save purchase to database');
+      }
+    } catch (error: any) {
+      console.error('❌ Payment/Purchase failed:', error);
+      alert(`❌ Payment failed: ${error.response?.data?.message || error.message || 'Please try again.'}`);
     } finally {
       setIsProcessing(false);
     }
@@ -1560,6 +1637,39 @@ export default function ProductsPage() {
     }
   };
 
+  // Debug function to test authentication
+  const testAuth = async () => {
+    const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+    console.log('🔐 Debug - Token available:', !!token);
+    console.log('🔐 Debug - Token value:', token ? token.substring(0, 20) + '...' : 'None');
+    
+    if (!token) {
+      alert('No token found. Please login first.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/api/purchases/test`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      console.log('🔐 Debug - Auth test response:', data);
+      
+      if (data.success) {
+        alert(`✅ Authentication working! User: ${data.user.email} (${data.user.role})`);
+      } else {
+        alert(`❌ Authentication failed: ${data.message}`);
+      }
+    } catch (error) {
+      console.error('🔐 Debug - Auth test error:', error);
+      alert(`❌ Authentication test failed: ${error}`);
+    }
+  };
+
   // Open product detail page
   const openProductDetail = (product: Product) => {
     console.log('👁️ Opening product detail page for:', product.id);
@@ -1978,6 +2088,15 @@ export default function ProductsPage() {
 
               {/* Cart and Favorites Buttons */}
               <div className="flex items-center gap-4">
+                {/* Debug button for testing auth */}
+                <button
+                  onClick={testAuth}
+                  className="p-2 bg-yellow-500 bg-opacity-20 rounded-full hover:bg-opacity-30 transition-all transform hover:scale-110 text-xs"
+                  title="Test Authentication"
+                >
+                  🔐 Test Auth
+                </button>
+
                 <button
                   onClick={() => setShowCart(true)}
                   className="relative p-3 bg-white bg-opacity-20 rounded-full hover:bg-opacity-30 transition-all transform hover:scale-110"

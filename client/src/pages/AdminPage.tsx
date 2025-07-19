@@ -4,48 +4,100 @@ import { useAuth } from '../contexts/AuthContext';
 import AdminAddProduct from './AdminAddProduct'; // ✅ Product management
 import AdminNotifications from '../components/AdminNotifications'; // ✅ Notifications
 import { ShoppingCart, Package, Shield, User, LogOut, Eye, EyeOff, Bell, BarChart3 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 // ✅ Purchase Analytics Component (moved from AdminDashboard.tsx)
 const PurchaseAnalytics = () => {
   const [purchases, setPurchases] = useState<any[]>([]);
   const [lastUpdate, setLastUpdate] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
 
-  // Function to load purchases from multiple possible localStorage keys
-  const loadPurchases = () => {
-    console.log('🔍 Admin: Loading purchases from localStorage...');
-    
-    // Check ALL localStorage keys to find where purchases might be stored
+  // Function to load purchases from MongoDB via API
+  const loadPurchases = async () => {
+    console.log('🔍 Admin: Loading purchases from MongoDB...');
+    setIsLoading(true);
+
+    try {
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+      console.log('🔐 Admin - Token available:', !!token);
+
+      if (!token) {
+        throw new Error('No authentication token found. Please login again.');
+      }
+
+      const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/purchases/admin/all`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('📊 Admin: MongoDB purchases response:', data);
+
+      if (data.success && data.data) {
+        // Transform MongoDB data to match expected format
+        const transformedPurchases = data.data.map((purchase: any) => ({
+          id: purchase._id,
+          orderId: purchase._id,
+          userId: purchase.userId?._id || purchase.userId,
+          userEmail: purchase.userId?.email || 'Unknown',
+          userName: purchase.userId?.firstName && purchase.userId?.lastName
+            ? `${purchase.userId.firstName} ${purchase.userId.lastName}`
+            : purchase.userId?.email || 'Unknown',
+          totalAmount: purchase.totalAmount,
+          amount: purchase.totalAmount,
+          status: purchase.status,
+          createdAt: purchase.createdAt,
+          items: purchase.items || [],
+          paymentMethod: purchase.paymentMethod,
+          shippingAddress: purchase.shippingAddress
+        }));
+
+        console.log(`📊 Admin: Loaded ${transformedPurchases.length} purchases from MongoDB`);
+        setPurchases(transformedPurchases);
+      } else {
+        console.warn('⚠️ No purchase data in response:', data);
+        setPurchases([]);
+      }
+    } catch (error) {
+      console.error('❌ Failed to load purchases from MongoDB:', error);
+
+      // Fallback to localStorage if MongoDB fails
+      console.log('🔄 Falling back to localStorage...');
+      loadPurchasesFromLocalStorage();
+    } finally {
+      setIsLoading(false);
+      setLastUpdate(new Date().toLocaleTimeString());
+    }
+  };
+
+  // Fallback function to load from localStorage
+  const loadPurchasesFromLocalStorage = () => {
+    console.log('🔍 Admin: Loading purchases from localStorage (fallback)...');
+
     const allLocalStorageKeys = Object.keys(localStorage);
-    console.log('🗂️ All localStorage keys:', allLocalStorageKeys);
-    
-    // Check specific keys where purchases might be stored
     const possibleKeys = [
-      'all_purchases',
-      'purchases', 
-      'user_purchases',
-      'purchase_history',
-      'completed_purchases',
-      'cart_purchases',
-      'purchase_data',
-      'orders',
-      'transactions',
-      'payment_history',
-      'user_orders'
+      'all_purchases', 'purchases', 'user_purchases', 'purchase_history',
+      'completed_purchases', 'cart_purchases', 'purchase_data',
+      'orders', 'transactions', 'payment_history', 'user_orders'
     ];
-    
+
     let allPurchases: any[] = [];
-    
-    // Check our expected keys
+
     possibleKeys.forEach(key => {
       const data = localStorage.getItem(key);
       if (data) {
         try {
           const parsed = JSON.parse(data);
           if (Array.isArray(parsed)) {
-            console.log(`📦 Found ${parsed.length} purchases in ${key}`);
             allPurchases = [...allPurchases, ...parsed];
           } else if (parsed && typeof parsed === 'object') {
-            console.log(`📦 Found single purchase in ${key}`);
             allPurchases.push(parsed);
           }
         } catch (e) {
@@ -53,48 +105,40 @@ const PurchaseAnalytics = () => {
         }
       }
     });
-    
-    // Also check ALL localStorage keys for anything that looks like purchase data
-    allLocalStorageKeys.forEach(key => {
-      if (!possibleKeys.includes(key)) {
-        const data = localStorage.getItem(key);
-        if (data) {
-          try {
-            const parsed = JSON.parse(data);
-            // Check if this might be purchase data
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              const firstItem = parsed[0];
-              if (firstItem && typeof firstItem === 'object' && 
-                  (firstItem.totalAmount || firstItem.amount || firstItem.price || 
-                   firstItem.items || firstItem.products || firstItem.cart)) {
-                console.log(`🔍 Possible purchase data found in key "${key}":`, parsed);
-                allPurchases = [...allPurchases, ...parsed];
-              }
-            } else if (parsed && typeof parsed === 'object' && 
-                      (parsed.totalAmount || parsed.amount || parsed.price || 
-                       parsed.items || parsed.products || parsed.cart)) {
-              console.log(`🔍 Possible single purchase found in key "${key}":`, parsed);
-              allPurchases.push(parsed);
-            }
-          } catch (e) {
-            // Not JSON, skip
-          }
-        }
-      }
-    });
-    
-    // Remove duplicates based on ID
-    const uniquePurchases = allPurchases.filter((purchase, index, self) => 
-      index === self.findIndex(p => (p.id && p.id === purchase.id) || 
-                                   (p.orderId && p.orderId === purchase.orderId) ||
-                                   index === self.indexOf(purchase))
+
+    const uniquePurchases = allPurchases.filter((purchase, index, self) =>
+      index === self.findIndex(p => (p.id && p.id === purchase.id) ||
+        (p.orderId && p.orderId === purchase.orderId) ||
+        index === self.indexOf(purchase))
     );
-    
-    console.log(`📊 Admin: Loaded ${uniquePurchases.length} unique purchases`);
-    console.log('🔍 Purchase data:', uniquePurchases);
-    
+
     setPurchases(uniquePurchases);
-    setLastUpdate(new Date().toLocaleTimeString());
+  };
+
+  // Function to update purchase status
+  const updatePurchaseStatus = async (purchaseId: string, newStatus: string) => {
+    setStatusUpdating(purchaseId);
+    try {
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+      if (!token) throw new Error('No authentication token found. Please login again.');
+      const response = await fetch(`${window.location.protocol}//${window.location.hostname}:5000/api/purchases/${purchaseId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const data = await response.json();
+      if (!data.success) throw new Error(data.message || 'Failed to update status');
+      // Update the local state
+      setPurchases(prev => prev.map(p => p.id === purchaseId ? { ...p, status: newStatus } : p));
+    } catch (err: any) {
+      alert(err.message || 'Failed to update status');
+    } finally {
+      setStatusUpdating(null);
+    }
   };
 
   // Load purchases on component mount
@@ -111,10 +155,10 @@ const PurchaseAnalytics = () => {
 
     // Listen for storage events (from other tabs)
     window.addEventListener('storage', handleStorageChange);
-    
+
     // Also check for changes periodically (for same-tab updates)
-    const interval = setInterval(loadPurchases, 2000); // Check every 2 seconds
-    
+    const interval = setInterval(loadPurchases, 5000); // Check every 5 seconds
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
@@ -125,13 +169,13 @@ const PurchaseAnalytics = () => {
     const amount = purchase.totalAmount || purchase.total || purchase.amount || 0;
     return sum + amount;
   }, 0);
-  
-  const completedPurchases = purchases.filter((p: any) => 
+
+  const completedPurchases = purchases.filter((p: any) =>
     p.status === 'completed' || p.status === 'success' || p.status === 'paid'
   ).length;
 
   const averageOrderValue = purchases.length > 0 ? totalRevenue / purchases.length : 0;
-  
+
   // Get recent purchases (last 7 days)
   const recentPurchases = purchases.filter((p: any) => {
     const purchaseDate = new Date(p.createdAt || p.timestamp || Date.now());
@@ -139,6 +183,39 @@ const PurchaseAnalytics = () => {
     weekAgo.setDate(weekAgo.getDate() - 7);
     return purchaseDate >= weekAgo;
   });
+
+  // Helper for status badge color
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'processing': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'shipped': return 'bg-indigo-100 text-indigo-800 border-indigo-300';
+      case 'delivered': return 'bg-green-100 text-green-800 border-green-300';
+      case 'completed': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+      case 'cancelled': return 'bg-red-100 text-red-800 border-red-300';
+      case 'refunded': return 'bg-gray-100 text-gray-800 border-gray-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  // Download as Excel handler
+  const handleDownloadExcel = () => {
+    // Prepare data for Excel
+    const data = purchases.slice(0, 10).map((purchase: any) => ({
+      'Order ID': purchase.id || purchase.orderId,
+      'Customer': purchase.userName || purchase.userEmail || 'Unknown',
+      'Amount': purchase.totalAmount || purchase.amount || 0,
+      'Items': Array.isArray(purchase.items) && purchase.items.length > 0
+        ? purchase.items.map((item: any) => `${item.productName} x${item.quantity}${item.size ? ` (${item.size})` : ''}`).join(', ')
+        : '-',
+      'Status': purchase.status || 'pending',
+      'Date': purchase.createdAt ? new Date(purchase.createdAt).toLocaleDateString() : 'Unknown',
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Purchases');
+    XLSX.writeFile(workbook, 'purchases.xlsx');
+  };
 
   return (
     <div className="space-y-6">
@@ -150,9 +227,19 @@ const PurchaseAnalytics = () => {
           </div>
           <button
             onClick={loadPurchases}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm"
+            disabled={isLoading}
+            className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2"
           >
-            🔄 Refresh
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Loading...
+              </>
+            ) : (
+              <>
+                🔄 Refresh
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -168,7 +255,7 @@ const PurchaseAnalytics = () => {
             <ShoppingCart className="w-8 h-8 opacity-80" />
           </div>
         </div>
-        
+
         <div className="bg-green-500 text-white p-6 rounded-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -178,7 +265,7 @@ const PurchaseAnalytics = () => {
             <BarChart3 className="w-8 h-8 opacity-80" />
           </div>
         </div>
-        
+
         <div className="bg-purple-500 text-white p-6 rounded-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -188,7 +275,7 @@ const PurchaseAnalytics = () => {
             <Package className="w-8 h-8 opacity-80" />
           </div>
         </div>
-        
+
         <div className="bg-orange-500 text-white p-6 rounded-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -220,8 +307,14 @@ const PurchaseAnalytics = () => {
       {/* Purchase List */}
       {purchases.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">🛒 Recent Purchases</h3>
+            <button
+              onClick={handleDownloadExcel}
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
+            >
+              ⬇️ Download as Excel
+            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -230,6 +323,7 @@ const PurchaseAnalytics = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                 </tr>
@@ -246,12 +340,36 @@ const PurchaseAnalytics = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       ₹{purchase.totalAmount || purchase.amount || 0}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {Array.isArray(purchase.items) && purchase.items.length > 0 ? (
+                        purchase.items.map((item, idx) => (
+                          <span key={idx}>
+                            {item.productName} x{item.quantity}{item.size ? ` (${item.size})` : ''}{idx < purchase.items.length - 1 ? ', ' : ''}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        purchase.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {purchase.status || 'pending'}
-                      </span>
+                      <select
+                        value={purchase.status || 'pending'}
+                        onChange={e => updatePurchaseStatus(purchase.id, e.target.value)}
+                        disabled={statusUpdating === purchase.id}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border focus:outline-none ${getStatusBadgeClass(purchase.status)}`}
+                        style={{ minWidth: 100 }}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="refunded">Refunded</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                      {statusUpdating === purchase.id && (
+                        <span className="ml-2 text-xs text-gray-400 animate-pulse">Updating...</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {purchase.createdAt ? new Date(purchase.createdAt).toLocaleDateString() : 'Unknown'}
@@ -275,8 +393,8 @@ const PurchaseAnalytics = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
             <h4 className="font-semibold text-blue-800 mb-2">💾 Database Notice</h4>
             <p className="text-sm text-blue-700">
-              Purchase data will be stored in MongoDB once you set up the backend database connection. 
-              For now, this shows any test data from localStorage.
+              Purchase data is now stored in MongoDB! This shows real purchase data from the database.
+              If no purchases appear, it means no orders have been placed yet.
             </p>
           </div>
         </div>
@@ -285,7 +403,7 @@ const PurchaseAnalytics = () => {
   );
 };
 
-// ✅ Admin Login Form Component
+// ✅ Admin Login Form - Now uses real backend API
 const AdminLoginForm = ({ onLogin }: { onLogin: (email: string, password: string) => void }) => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -384,6 +502,12 @@ const AdminLoginForm = ({ onLogin }: { onLogin: (email: string, password: string
               🚀 Login as Admin (admin@tshirtapp.com / admin123)
             </button>
             <button
+              onClick={() => handleQuickLogin('user@test.com', 'user123')}
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium"
+            >
+              👤 Login as User (user@test.com / user123)
+            </button>
+            <button
               onClick={() => handleQuickLogin('superadmin@tshirtapp.com', 'super123')}
               className="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 px-4 rounded-lg text-sm font-medium"
             >
@@ -407,54 +531,33 @@ const AdminLoginForm = ({ onLogin }: { onLogin: (email: string, password: string
 
 // ✅ MAIN ADMIN PAGE COMPONENT
 const AdminPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, login, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('notifications'); // Default to notifications
 
   // Debug info
   console.log('🔍 AdminPage - Current user:', user);
   console.log('🔍 AdminPage - User email:', user?.email);
 
-  // Enhanced admin check
-  const isAdmin = user?.email === 'admin@tshirtapp.com' || 
-                  user?.email === 'superadmin@tshirtapp.com' ||
-                  user?.role === 'admin' || 
-                  user?.role === 'superadmin';
-  
+  // Enhanced admin check - now checks for admin role from backend
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+
   console.log('🔍 AdminPage - Is admin?', isAdmin);
 
-  // Handle admin login
+  // Handle admin login using real backend API
   const handleAdminLogin = async (email: string, password: string) => {
     console.log('🔐 Admin login attempt:', email);
 
-    // Validate admin credentials
-    const validCredentials = [
-      { email: 'admin@tshirtapp.com', password: 'admin123', role: 'admin' },
-      { email: 'superadmin@tshirtapp.com', password: 'super123', role: 'superadmin' }
-    ];
+    try {
+      // Use the real login function from AuthContext
+      await login(email, password, true); // Remember me = true for admin
+      console.log('✅ Admin login successful');
 
-    const validUser = validCredentials.find(
-      cred => cred.email === email && cred.password === password
-    );
+      // The AuthContext will handle storing the user data and tokens
+      // No need to manually reload the page
 
-    if (validUser) {
-      // Create admin user object
-      const adminUser = {
-        id: validUser.role === 'superadmin' ? 'superadmin_001' : 'admin_001',
-        email: validUser.email,
-        firstName: validUser.role === 'superadmin' ? 'Super' : 'Admin',
-        lastName: 'User',
-        name: validUser.role === 'superadmin' ? 'Super Admin' : 'Admin User',
-        role: validUser.role
-      };
-
-      // Save to localStorage (simulate login)
-      localStorage.setItem('current_user', JSON.stringify(adminUser));
-      console.log('✅ Admin login successful:', adminUser);
-      
-      // Reload page to trigger auth context update
-      window.location.reload();
-    } else {
-      throw new Error('Invalid admin credentials');
+    } catch (error: any) {
+      console.error('❌ Admin login failed:', error);
+      throw error; // Re-throw to be handled by the form
     }
   };
 
@@ -474,7 +577,7 @@ const AdminPage: React.FC = () => {
             You're logged in as: <strong>{user.email}</strong>
           </p>
           <p className="text-gray-600 mb-6">But you don't have admin permissions.</p>
-          
+
           <div className="space-y-4">
             <button
               onClick={() => {
@@ -485,7 +588,7 @@ const AdminPage: React.FC = () => {
             >
               🔓 Logout & Login as Admin
             </button>
-            
+
             <button
               onClick={() => window.location.href = '/'}
               className="w-full bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg"
@@ -500,7 +603,7 @@ const AdminPage: React.FC = () => {
 
   // ✅ MAIN ADMIN DASHBOARD
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 p-20">
       {/* ✅ Admin Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -511,7 +614,7 @@ const AdminPage: React.FC = () => {
                 Welcome, <strong>{user.name || user.email}</strong>
               </p>
             </div>
-            
+
             <div className="flex items-center gap-4">
               <div className="text-sm text-gray-600">
                 Role: <span className="font-medium text-green-600">{user.role || 'Admin'}</span>
@@ -528,41 +631,36 @@ const AdminPage: React.FC = () => {
               </button>
             </div>
           </div>
-          
+
           {/* ✅ Navigation Tabs */}
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
               <button
                 onClick={() => setActiveTab('notifications')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                  activeTab === 'notifications'
+                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'notifications'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 <Bell className="w-4 h-4" />
                 🔔 Notifications
               </button>
-              
               <button
                 onClick={() => setActiveTab('analytics')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                  activeTab === 'analytics'
+                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'analytics'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 <BarChart3 className="w-4 h-4" />
                 📊 Analytics
               </button>
-              
               <button
                 onClick={() => setActiveTab('products')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
-                  activeTab === 'products'
+                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'products'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 <Package className="w-4 h-4" />
                 📦 Products

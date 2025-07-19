@@ -19,6 +19,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
     password: '',
     confirmPassword: '',
     phone: '',
+    agreeToTerms: false,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -32,8 +33,20 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
       return;
     }
 
+    if (!formData.agreeToTerms) {
+      return;
+    }
+
     try {
-      await register(formData);
+      await register({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+        confirmPassword: formData.confirmPassword,
+        phone: formData.phone,
+        agreeToTerms: formData.agreeToTerms,
+      });
       setRegistrationSuccess(true);
     } catch (error) {
       // Error is handled by context
@@ -41,10 +54,10 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value,
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
@@ -94,7 +107,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
-              First Name
+              First Name *
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -115,7 +128,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
 
           <div>
             <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
-              Last Name
+              Last Name *
             </label>
             <input
               id="lastName"
@@ -133,7 +146,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
         {/* Email Field */}
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-            Email Address
+            Email Address *
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -176,7 +189,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
         {/* Password Fields */}
         <div>
           <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-            Password
+            Password *
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -211,7 +224,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
 
         <div>
           <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-            Confirm Password
+            Confirm Password *
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -244,10 +257,38 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({
           )}
         </div>
 
+        {/* Terms and Conditions */}
+        <div className="flex items-start">
+          <div className="flex items-center h-5">
+            <input
+              id="agreeToTerms"
+              name="agreeToTerms"
+              type="checkbox"
+              required
+              checked={formData.agreeToTerms}
+              onChange={handleInputChange}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+          </div>
+          <div className="ml-3 text-sm">
+            <label htmlFor="agreeToTerms" className="text-gray-700">
+              I agree to the{' '}
+              <a href="#" className="text-blue-600 hover:text-blue-500">
+                Terms and Conditions
+              </a>{' '}
+              and{' '}
+              <a href="#" className="text-blue-600 hover:text-blue-500">
+                Privacy Policy
+              </a>
+              *
+            </label>
+          </div>
+        </div>
+
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={state.isLoading || formData.password !== formData.confirmPassword}
+          disabled={state.isLoading || formData.password !== formData.confirmPassword || !formData.agreeToTerms}
           className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
         >
           {state.isLoading ? (

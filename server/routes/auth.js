@@ -1,27 +1,24 @@
-const express = require('express');
-const { OAuth2Client } = require('google-auth-library');
-const crypto = require('crypto');
-const User = require('../models/User');
-const { protect } = require('../middleware/auth');
-const { sendEmail } = require('../utils/email');
-const { validateRegister, validateLogin } = require('../utils/validation');
+import express from 'express';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import User from '../models/user.js';
 
 const router = express.Router();
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// Helper function to generate JWT token
+const generateToken = (userId, email, role) => {
+  return jwt.sign(
+    { id: userId, email, role },
+    process.env.JWT_SECRET || 'your-secret-key',
+    { expiresIn: '24h' }
+  );
+};
 
 // @desc    Register user
 // @route   POST /api/auth/register
 // @access  Public
 router.post('/register', async (req, res) => {
   try {
-    const { error } = validateRegister(req.body);
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.details[0].message,
-      });
-    }
-
     const { firstName, lastName, email, password, phone, agreeToTerms } = req.body;
 
     if (!agreeToTerms) {
@@ -53,17 +50,8 @@ router.post('/register', async (req, res) => {
     const verificationToken = user.generateEmailVerificationToken();
     await user.save();
 
-    // Send verification email
-    const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${verificationToken}`;
-    await sendEmail({
-      to: email,
-      subject: 'Email Verification - PrintCraft',
-      template: 'email-verification',
-      data: {
-        name: `${firstName} ${lastName}`,
-        verificationUrl,
-      },
-    });
+    // In a real app, you would send verification email here
+    console.log(`Verification email would be sent to: ${email}`);
 
     res.status(201).json({
       success: true,
@@ -83,18 +71,11 @@ router.post('/register', async (req, res) => {
 // @access  Public
 router.post('/login', async (req, res) => {
   try {
-    const { error } = validateLogin(req.body);
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.details[0].message,
-      });
-    }
-
     const { email, password } = req.body;
-
+    
     // Find user and include password for comparison
     const user = await User.findOne({ email }).select('+password');
+    
     if (!user || !user.isActive) {
       return res.status(401).json({
         success: false,
@@ -104,6 +85,7 @@ router.post('/login', async (req, res) => {
 
     // Check password
     const isMatch = await user.comparePassword(password);
+
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -139,166 +121,6 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// @desc    Google OAuth login
-// @route   POST /api/auth/google
-// @access  Public
-router.post('/google', async (req, res) => {
-  try {
-    const { credential } = req.body;
-
-    // Verify Google token
-    const ticket = await googleClient.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-
-    const payload = ticket.getPayload();
-    const { sub: googleId, email, given_name, family_name, picture } = payload;
-
-    // Check if user exists
-    let user = await User.findOne({ email });
-
-    if (user) {
-      // Update user if it's not a Google user
-      if (user.provider !== 'google') {
-        user.provider = 'google';
-        user.providerId = googleId;
-        user.avatar = picture;
-        user.isEmailVerified = true;
-      }
-    } else {
-      // Create new user
-      user = new User({
-        email,
-        firstName: given_name,
-        lastName: family_name,
-        provider: 'google',
-        providerId: googleId,
-        avatar: picture,
-        isEmailVerified: true,
-      });
-    }
-
-    user.lastLoginAt = new Date();
-    await user.save();
-
-    // Generate tokens
-    const { accessToken, refreshToken } = user.generateTokens();
-    
-    // Save refresh token
-    user.refreshTokens.push(refreshToken);
-    await user.save();
-
-    // Remove sensitive data
-    user.refreshTokens = undefined;
-
-    res.json({
-      success: true,
-      message: 'Google login successful!',
-      user,
-      token: accessToken,
-      refreshToken,
-    });
-  } catch (error) {
-    console.error('Google auth error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Google authentication failed.',
-    });
-  }
-});
-
-// @desc    Refresh token
-// @route   POST /api/auth/refresh
-// @access  Public
-router.post('/refresh', async (req, res) => {
-  try {
-    const { refreshToken } = req.body;
-
-    if (!refreshToken) {
-      return res.status(401).json({
-        success: false,
-        message: 'Refresh token required.',
-      });
-    }
-
-    try {
-      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-      const user = await User.findById(decoded.id);
-
-      if (!user || !user.refreshTokens.includes(refreshToken)) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid refresh token.',
-        });
-      }
-
-      // Generate new tokens
-      const tokens = user.generateTokens();
-      
-      // Replace old refresh token with new one
-      user.refreshTokens = user.refreshTokens.filter(token => token !== refreshToken);
-      user.refreshTokens.push(tokens.refreshToken);
-      await user.save();
-
-      res.json({
-        success: true,
-        token: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-      });
-    } catch (error) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid refresh token.',
-      });
-    }
-  } catch (error) {
-    console.error('Token refresh error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during token refresh.',
-    });
-  }
-});
-
-// @desc    Verify token
-// @route   GET /api/auth/verify
-// @access  Private
-router.get('/verify', protect, async (req, res) => {
-  res.json({
-    success: true,
-    user: req.user,
-  });
-});
-
-// @desc    Logout
-// @route   POST /api/auth/logout
-// @access  Private
-router.post('/logout', protect, async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (token) {
-      // Remove all refresh tokens for this user (logout from all devices)
-      // Or implement device-specific logout by tracking device IDs
-      req.user.refreshTokens = [];
-      await req.user.save();
-    }
-
-    res.json({
-      success: true,
-      message: 'Logout successful.',
-    });
-  } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during logout.',
-    });
-  }
-});
-
 // @desc    Forgot password
 // @route   POST /api/auth/forgot-password
 // @access  Public
@@ -319,17 +141,8 @@ router.post('/forgot-password', async (req, res) => {
     const resetToken = user.generatePasswordResetToken();
     await user.save();
 
-    // Send reset email
-    const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
-    await sendEmail({
-      to: email,
-      subject: 'Password Reset - PrintCraft',
-      template: 'password-reset',
-      data: {
-        name: user.name,
-        resetUrl,
-      },
-    });
+    // In a real app, you would send reset email here
+    console.log(`Password reset requested for: ${email}`);
 
     res.json({
       success: true,
@@ -359,7 +172,7 @@ router.post('/reset-password', async (req, res) => {
     }
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
       const user = await User.findOne({
         _id: decoded.id,
         passwordResetToken: token,
@@ -407,7 +220,7 @@ router.post('/verify-email', async (req, res) => {
     const { token } = req.body;
 
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
       const user = await User.findOne({
         _id: decoded.id,
         emailVerificationToken: token,
@@ -445,168 +258,136 @@ router.post('/verify-email', async (req, res) => {
   }
 });
 
-module.exports = router;
-
-// ============================================================================
-// server/routes/admin.js - Admin User Management
-// ============================================================================
-
-const adminRouter = express.Router();
-
-// @desc    Get all users (Admin only)
-// @route   GET /api/admin/users
-// @access  Private/Admin
-adminRouter.get('/users', protect, authorize('admin', 'superadmin'), async (req, res) => {
+// @desc    Verify token
+// @route   GET /api/auth/verify
+// @access  Private
+router.get('/verify', async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const search = req.query.search || '';
-    const role = req.query.role || '';
-    const status = req.query.status || '';
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
 
-    // Build query
-    const query = {};
-    
-    if (search) {
-      query.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-      ];
-    }
-    
-    if (role) {
-      query.role = role;
-    }
-    
-    if (status === 'active') {
-      query.isActive = true;
-    } else if (status === 'inactive') {
-      query.isActive = false;
-    }
-
-    const users = await User.find(query)
-      .select('-password -refreshTokens')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    const total = await User.countDocuments(query);
-
-    res.json({
-      success: true,
-      data: {
-        users,
-        pagination: {
-          current: page,
-          pages: Math.ceil(total / limit),
-          total,
-        },
-      },
-    });
-  } catch (error) {
-    console.error('Get users error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching users.',
-    });
-  }
-});
-
-// @desc    Get user purchases (Admin only)
-// @route   GET /api/admin/users/:userId/purchases
-// @access  Private/Admin
-adminRouter.get('/users/:userId/purchases', protect, authorize('admin', 'superadmin'), async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-
-    const purchases = await Purchase.find({ userId })
-      .populate('items.productId', 'name imageUrl')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    const total = await Purchase.countDocuments({ userId });
-
-    res.json({
-      success: true,
-      data: {
-        purchases,
-        pagination: {
-          current: page,
-          pages: Math.ceil(total / limit),
-          total,
-        },
-      },
-    });
-  } catch (error) {
-    console.error('Get user purchases error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching user purchases.',
-    });
-  }
-});
-
-// @desc    Get all purchases (Admin only)
-// @route   GET /api/admin/purchases
-// @access  Private/Admin
-adminRouter.get('/purchases', protect, authorize('admin', 'superadmin'), async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const status = req.query.status || '';
-    const search = req.query.search || '';
-
-    // Build query
-    const query = {};
-    
-    if (status) {
-      query.status = status;
-    }
-
-    let purchases = await Purchase.find(query)
-      .populate('userId', 'firstName lastName email')
-      .populate('items.productId', 'name imageUrl')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    // Filter by user search if provided
-    if (search) {
-      purchases = purchases.filter(purchase => {
-        const user = purchase.userId;
-        return user && (
-          user.firstName.toLowerCase().includes(search.toLowerCase()) ||
-          user.lastName.toLowerCase().includes(search.toLowerCase()) ||
-          user.email.toLowerCase().includes(search.toLowerCase()) ||
-          purchase._id.toString().includes(search)
-        );
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided.',
       });
     }
 
-    const total = await Purchase.countDocuments(query);
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token.',
+      });
+    }
+
+    // Remove sensitive data
+    user.password = undefined;
+    user.refreshTokens = undefined;
 
     res.json({
       success: true,
-      data: {
-        purchases,
-        pagination: {
-          current: page,
-          pages: Math.ceil(total / limit),
-          total,
-        },
-      },
+      user,
     });
   } catch (error) {
-    console.error('Get purchases error:', error);
-    res.status(500).json({
+    console.error('Token verification error:', error);
+    res.status(401).json({
       success: false,
-      message: 'Server error while fetching purchases.',
+      message: 'Invalid token.',
     });
   }
 });
 
-module.exports = { authRouter: router, adminRouter };
+// @desc    Logout
+// @route   POST /api/auth/logout
+// @access  Private
+router.post('/logout', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const user = await User.findById(decoded.id);
+        
+        if (user) {
+          // Remove all refresh tokens for this user (logout from all devices)
+          user.refreshTokens = [];
+          await user.save();
+        }
+      } catch (error) {
+        console.error('Token verification error during logout:', error);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Logout successful.',
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during logout.',
+    });
+  }
+});
+
+// @desc    Refresh token
+// @route   POST /api/auth/refresh
+// @access  Public
+router.post('/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: 'Refresh token required.',
+      });
+    }
+
+    try {
+      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'your-refresh-secret');
+      const user = await User.findById(decoded.id);
+
+      if (!user || !user.refreshTokens.includes(refreshToken)) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid refresh token.',
+        });
+      }
+
+      // Generate new tokens
+      const tokens = user.generateTokens();
+      
+      // Replace old refresh token with new one
+      user.refreshTokens = user.refreshTokens.filter(token => token !== refreshToken);
+      user.refreshTokens.push(tokens.refreshToken);
+      await user.save();
+
+      res.json({
+        success: true,
+        token: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      });
+    } catch (error) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid refresh token.',
+      });
+    }
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during token refresh.',
+    });
+  }
+});
+
+export default router;

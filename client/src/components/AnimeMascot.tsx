@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, MessageCircle, Volume2, VolumeX } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
+import { Button } from './ui/button';
+import { useToast } from '../hooks/use-toast';
+import { useLocation } from 'wouter';
 
 // Define the mascot character types and their properties
 type MascotType = 'neko' | 'samurai' | 'magical';
@@ -196,6 +197,7 @@ export default function AnimeMascot({
   const [animation, setAnimation] = useState<string>(currentMascot.animations.entrance);
   const messageTimeoutRef = useRef<number | null>(null);
   const { toast } = useToast();
+  const [location, setLocation] = useLocation();
 
   const positionClasses = {
     'bottom-right': 'bottom-4 right-4',
@@ -210,7 +212,7 @@ export default function AnimeMascot({
       const randomGreeting = currentMascot.greetings[Math.floor(Math.random() * currentMascot.greetings.length)];
       showMessage(randomGreeting, 'happy');
     }
-    
+
     return () => {
       if (messageTimeoutRef.current) {
         window.clearTimeout(messageTimeoutRef.current);
@@ -223,12 +225,12 @@ export default function AnimeMascot({
     setCurrentExpression(expression);
     setMessage(text);
     setAnimation(currentMascot.animations.talking);
-    
+
     // Clear any existing timeout
     if (messageTimeoutRef.current) {
       window.clearTimeout(messageTimeoutRef.current);
     }
-    
+
     // Set timeout to clear message and return to idle
     messageTimeoutRef.current = window.setTimeout(() => {
       setMessage('');
@@ -241,7 +243,7 @@ export default function AnimeMascot({
   const changeMascot = (type: MascotType) => {
     setIsChangingMascot(false);
     setAnimation(currentMascot.animations.exit);
-    
+
     // After exit animation, change the mascot
     setTimeout(() => {
       setCurrentMascot(mascotCharacters[type]);
@@ -256,7 +258,7 @@ export default function AnimeMascot({
     const randomCategory = categories[Math.floor(Math.random() * categories.length)];
     const responses = currentMascot.responses[randomCategory];
     const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-    
+
     showMessage(randomResponse, 'excited');
   };
 
@@ -273,14 +275,14 @@ export default function AnimeMascot({
     <div className={`fixed ${positionClasses[position]} z-50 transition-all duration-300 ease-in-out`}>
       {/* Minimized state - just shows the mascot head */}
       {isMinimized ? (
-        <div 
+        <div
           className="cursor-pointer bg-white rounded-full p-2 shadow-lg hover:shadow-xl transition-all hover:scale-110"
           onClick={() => setIsMinimized(false)}
         >
           <div className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden border-2 border-red-500">
-            <img 
-              src={currentMascot.avatar} 
-              alt={currentMascot.name} 
+            <img
+              src={currentMascot.avatar}
+              alt={currentMascot.name}
               className="w-full h-full object-cover animate-pulse-slow"
             />
           </div>
@@ -294,9 +296,9 @@ export default function AnimeMascot({
             <div className="bg-gradient-to-r from-red-500 to-red-600 p-2 flex justify-between items-center">
               <div className="flex items-center">
                 <span className="text-white font-medium">{currentMascot.name}</span>
-                
+
                 {/* Mascot selector button */}
-                <button 
+                <button
                   onClick={() => setIsChangingMascot(!isChangingMascot)}
                   className="ml-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-1"
                 >
@@ -306,18 +308,18 @@ export default function AnimeMascot({
                   </svg>
                 </button>
               </div>
-              
+
               <div className="flex space-x-1">
                 {/* Sound toggle */}
-                <button 
+                <button
                   onClick={toggleSound}
                   className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-1.5"
                 >
                   {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                 </button>
-                
+
                 {/* Minimize button */}
-                <button 
+                <button
                   onClick={() => setIsMinimized(true)}
                   className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-1.5"
                 >
@@ -327,7 +329,7 @@ export default function AnimeMascot({
                 </button>
               </div>
             </div>
-            
+
             {/* Mascot selector dropdown */}
             {isChangingMascot && (
               <div className="bg-white border-b border-gray-200 p-2 animate-fade-in">
@@ -337,18 +339,17 @@ export default function AnimeMascot({
                     <button
                       key={type}
                       onClick={() => changeMascot(type as MascotType)}
-                      className={`flex-1 p-1.5 rounded-lg border transition-all ${
-                        currentMascot.type === type 
-                          ? 'border-red-500 bg-red-50' 
-                          : 'border-gray-200 hover:border-red-300 hover:bg-red-50'
-                      }`}
+                      className={`flex-1 p-1.5 rounded-lg border transition-all ${currentMascot.type === type
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-gray-200 hover:border-red-300 hover:bg-red-50'
+                        }`}
                     >
                       <div className="flex flex-col items-center">
                         <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200">
-                          <img 
-                            src={mascotCharacters[type as MascotType].avatar} 
+                          <img
+                            src={mascotCharacters[type as MascotType].avatar}
                             alt={mascotCharacters[type as MascotType].name}
-                            className="w-full h-full object-cover" 
+                            className="w-full h-full object-cover"
                           />
                         </div>
                         <span className="text-xs mt-1">{mascotCharacters[type as MascotType].name}</span>
@@ -358,17 +359,17 @@ export default function AnimeMascot({
                 </div>
               </div>
             )}
-            
+
             {/* Mascot character display */}
             <div className="p-3 flex">
               <div className="mr-3 flex-shrink-0">
-                <div 
+                <div
                   className={`relative w-16 h-16 rounded-full overflow-hidden border-2 border-red-200 ${animation}`}
                 >
-                  <img 
-                    src={currentMascot.avatar} 
+                  <img
+                    src={currentMascot.avatar}
                     alt={currentMascot.name}
-                    className="w-full h-full object-cover" 
+                    className="w-full h-full object-cover"
                   />
                   {/* Expression overlay */}
                   <div className="absolute bottom-0 right-0 bg-white rounded-full w-6 h-6 flex items-center justify-center border border-red-200">
@@ -376,12 +377,11 @@ export default function AnimeMascot({
                   </div>
                 </div>
               </div>
-              
+
               {/* Message bubble */}
               <div className="flex-1 relative">
-                <div className={`bg-gray-100 p-2 rounded-lg min-h-[50px] flex items-center message-bubble ${
-                  message ? 'animate-pop-in' : ''
-                }`}>
+                <div className={`bg-gray-100 p-2 rounded-lg min-h-[50px] flex items-center message-bubble ${message ? 'animate-pop-in' : ''
+                  }`}>
                   <p className="text-sm text-gray-800">
                     {message || "How can I help you today?"}
                   </p>
@@ -389,7 +389,7 @@ export default function AnimeMascot({
                 <div className="absolute left-[-6px] top-3 w-3 h-3 bg-gray-100 transform rotate-45"></div>
               </div>
             </div>
-            
+
             {/* Action buttons */}
             <div className="p-3 pt-0 grid grid-cols-2 gap-2">
               <Button
@@ -398,41 +398,49 @@ export default function AnimeMascot({
                 className="text-xs border-red-200 hover:bg-red-50 hover:text-red-600"
                 onClick={() => {
                   showMessage(currentMascot.responses.products[Math.floor(Math.random() * currentMascot.responses.products.length)], 'happy');
+                  setTimeout(() => setLocation('/products'), 600);
                 }}
               >
                 Show Products
               </Button>
-              
+
               <Button
                 variant="outline"
                 size="sm"
                 className="text-xs border-red-200 hover:bg-red-50 hover:text-red-600"
                 onClick={() => {
                   showMessage(currentMascot.responses.customize[Math.floor(Math.random() * currentMascot.responses.customize.length)], 'excited');
+                  setTimeout(() => setLocation('/customize'), 600);
                 }}
               >
-                Customize Help
+                Customize
               </Button>
-              
+
               <Button
                 variant="outline"
                 size="sm"
                 className="text-xs border-red-200 hover:bg-red-50 hover:text-red-600"
-                onClick={showRandomTip}
+                onClick={() => {
+                  showMessage('Here are your orders, nyaa~!', 'excited');
+                  setTimeout(() => setLocation('/user-orders'), 600);
+                }}
               >
-                Random Tip
+                Orders
               </Button>
-              
               <Button
                 variant="outline"
                 size="sm"
                 className="text-xs border-red-200 hover:bg-red-50 hover:text-red-600"
                 onClick={() => {
                   showMessage(currentMascot.responses.help[Math.floor(Math.random() * currentMascot.responses.help.length)], 'happy');
+                  setTimeout(() => {
+                    window.open('https://wa.me/919266767693', '_blank');
+                  }, 600);
                 }}
               >
                 Need Help
               </Button>
+
             </div>
           </div>
         </div>

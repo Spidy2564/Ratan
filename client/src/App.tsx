@@ -15,6 +15,7 @@ import Footer from "@/components/Footer";
 import AnimeMascot from "@/components/AnimeMascot";
 import { AuthProvider } from "./contexts/AuthContext";
 import { PurchaseProvider } from "./contexts/PurchaseContext";
+import UserOrders from "./pages/UserOrders";
 
 window.addEventListener("DOMContentLoaded", () => {
   const imgs = document.querySelectorAll("img:not([loading])");
@@ -32,6 +33,7 @@ function Router() {
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/products" component={ProductsPage} />
+          <Route path="/user-orders" component={UserOrders} />
           <Route path="/contact" component={ContactPage} />
           <Route path="/customize" component={CustomizePage} />
           <Route path="/tshirt-designer" component={TShirtDesignerDemo} />

@@ -384,6 +384,17 @@ export default function Navbar() {
                     <div className="glass-nav-bg"></div>
                   </Link>
                 </li>
+                <li>
+                  <Link href="/user-orders" className="glass-nav-item group">
+                    <div className="glass-nav-content">
+                      <span className="nav-icon group-hover:scale-110 transition-transform duration-300">
+                        <ShoppingBag size={18} />
+                      </span>
+                      <span className="nav-title">Orders</span>
+                    </div>
+                    <div className="glass-nav-bg"></div>
+                  </Link>
+                </li>
                 
                 {/* ADMIN LINK - PROPERLY PLACED */}
                 {isAdmin && (

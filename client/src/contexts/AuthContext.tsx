@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authApi, tokenManager } from '../lib/api';
 
 interface User {
   id: string;
@@ -8,12 +9,14 @@ interface User {
   name?: string;
   role?: string;
   phone?: string;
+  isEmailVerified?: boolean;
 }
 
 interface AuthState {
   user: User | null;
   isLoading: boolean;
   error: string | null;
+  isAuthenticated: boolean;
 }
 
 interface RegisterData {
@@ -23,6 +26,7 @@ interface RegisterData {
   password: string;
   confirmPassword: string;
   phone?: string;
+  agreeToTerms: boolean;
 }
 
 interface AuthContextType {
@@ -33,6 +37,7 @@ interface AuthContextType {
   forgotPassword: (email: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
+  verifyAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,64 +45,94 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AuthState>({
     user: null,
-    isLoading: false,
+    isLoading: true,
     error: null,
+    isAuthenticated: false,
   });
 
-  // Load user from localStorage on mount
+  // Verify authentication on mount
   useEffect(() => {
-    const savedUser = localStorage.getItem('current_user');
-    if (savedUser) {
-      try {
-        const user = JSON.parse(savedUser);
-        console.log('🔄 AuthContext: Loading saved user:', user.email);
-        setState(prev => ({ ...prev, user }));
-      } catch (error) {
-        console.error('❌ AuthContext: Error loading saved user:', error);
-        localStorage.removeItem('current_user');
-      }
-    }
+    verifyAuth();
   }, []);
+
+  const verifyAuth = async (): Promise<void> => {
+    try {
+      const token = tokenManager.getAccessToken();
+      if (!token) {
+        setState(prev => ({ ...prev, isLoading: false, isAuthenticated: false }));
+        return;
+      }
+
+      const response = await authApi.verifyToken();
+      if (response.success && response.user) {
+        setState(prev => ({ 
+          ...prev, 
+          user: response.user, 
+          isLoading: false, 
+          isAuthenticated: true 
+        }));
+        console.log('✅ AuthContext: User verified:', response.user.email);
+      } else {
+        // Token is invalid, clear it
+        tokenManager.clearTokens();
+        setState(prev => ({ 
+          ...prev, 
+          user: null, 
+          isLoading: false, 
+          isAuthenticated: false 
+        }));
+      }
+    } catch (error: any) {
+      console.error('❌ AuthContext: Token verification failed:', error);
+      tokenManager.clearTokens();
+      setState(prev => ({ 
+        ...prev, 
+        user: null, 
+        isLoading: false, 
+        isAuthenticated: false 
+      }));
+    }
+  };
 
   const login = async (email: string, password: string, rememberMe: boolean = false): Promise<void> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     console.log('🔄 AuthContext: Login attempt:', email);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      let user: User;
+      const response = await authApi.login({ email, password });
       
-      if (email === 'admin@tshirtapp.com' && password === 'admin123') {
-        user = {
-          id: 'admin_001',
-          email: 'admin@tshirtapp.com',
-          firstName: 'Admin',
-          lastName: 'User',
-          name: 'Admin User',
-          role: 'admin'
+      if (response.success && response.user && response.token) {
+        // Store tokens
+        tokenManager.setTokens(response.token, response.refreshToken);
+        
+        // Store user data
+        const userData = {
+          id: response.user._id || response.user.id,
+          email: response.user.email,
+          firstName: response.user.firstName,
+          lastName: response.user.lastName,
+          name: response.user.name || `${response.user.firstName} ${response.user.lastName}`,
+          role: response.user.role || 'user',
+          phone: response.user.phone,
+          isEmailVerified: response.user.isEmailVerified,
         };
-      } else if (email === 'user@test.com' && password === 'user123') {
-        user = {
-          id: 'user_001',
-          email: 'user@test.com',
-          firstName: 'Test',
-          lastName: 'User',
-          name: 'Test User',
-          role: 'user'
-        };
-      } else {
-        throw new Error('Invalid email or password');
-      }
 
-      if (rememberMe) {
-        localStorage.setItem('current_user', JSON.stringify(user));
-      } else {
-        sessionStorage.setItem('current_user', JSON.stringify(user));
-      }
+        if (rememberMe) {
+          localStorage.setItem('current_user', JSON.stringify(userData));
+        } else {
+          sessionStorage.setItem('current_user', JSON.stringify(userData));
+        }
 
-      setState(prev => ({ ...prev, user, isLoading: false }));
-      console.log('✅ AuthContext: Login successful:', user.email);
+        setState(prev => ({ 
+          ...prev, 
+          user: userData, 
+          isLoading: false, 
+          isAuthenticated: true 
+        }));
+        console.log('✅ AuthContext: Login successful:', userData.email);
+      } else {
+        throw new Error(response.message || 'Login failed');
+      }
     } catch (error: any) {
       console.error('❌ AuthContext: Login error:', error);
       setState(prev => ({ 
@@ -113,22 +148,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      const user: User = {
-        id: `user_${Date.now()}`,
-        email: data.email,
+      const response = await authApi.register({
         firstName: data.firstName,
         lastName: data.lastName,
-        name: `${data.firstName} ${data.lastName}`,
+        email: data.email,
+        password: data.password,
         phone: data.phone,
-        role: 'user'
-      };
+        agreeToTerms: data.agreeToTerms,
+      });
 
-      localStorage.setItem('current_user', JSON.stringify(user));
-      setState(prev => ({ ...prev, user, isLoading: false }));
-      console.log('✅ AuthContext: Registration successful:', user.email);
+      if (response.success) {
+        setState(prev => ({ ...prev, isLoading: false }));
+        console.log('✅ AuthContext: Registration successful, verification email sent');
+      } else {
+        throw new Error(response.message || 'Registration failed');
+      }
     } catch (error: any) {
+      console.error('❌ AuthContext: Registration error:', error);
       setState(prev => ({ 
         ...prev, 
         isLoading: false, 
@@ -142,10 +178,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log(`Password reset link sent to: ${email}`);
-      setState(prev => ({ ...prev, isLoading: false }));
+      const response = await authApi.forgotPassword(email);
+      
+      if (response.success) {
+        setState(prev => ({ ...prev, isLoading: false }));
+        console.log('✅ AuthContext: Password reset email sent to:', email);
+      } else {
+        throw new Error(response.message || 'Failed to send reset email');
+      }
     } catch (error: any) {
+      console.error('❌ AuthContext: Forgot password error:', error);
       setState(prev => ({ 
         ...prev, 
         isLoading: false, 
@@ -155,11 +197,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = (): void => {
-    localStorage.removeItem('current_user');
-    sessionStorage.removeItem('current_user');
-    setState(prev => ({ ...prev, user: null }));
-    console.log('🔄 AuthContext: User logged out');
+  const logout = async (): Promise<void> => {
+    try {
+      // Call logout API to invalidate tokens on server
+      await authApi.logout();
+    } catch (error) {
+      console.error('❌ AuthContext: Logout API error:', error);
+    } finally {
+      // Clear local storage regardless of API call success
+      tokenManager.clearTokens();
+      localStorage.removeItem('current_user');
+      sessionStorage.removeItem('current_user');
+      setState(prev => ({ 
+        ...prev, 
+        user: null, 
+        isAuthenticated: false 
+      }));
+      console.log('🔄 AuthContext: User logged out');
+    }
   };
 
   const clearError = (): void => {
@@ -174,6 +229,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     forgotPassword,
     logout,
     clearError,
+    verifyAuth,
   };
 
   return (
