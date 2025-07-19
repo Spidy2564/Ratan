@@ -1,8 +1,9 @@
+import React from "react";
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Button } from "@/components/ui/button";
+import { Button } from "../components/ui/button";
 import { Menu, Home, Palette, Mail, ShoppingBag, Shield } from "lucide-react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "../components/ui/sheet";
 import { useAuth } from "../contexts/AuthContext"; // FIXED: Changed from "../../contexts/AuthContext" to "../contexts/AuthContext"
 
 export default function Navbar() {
@@ -26,10 +27,10 @@ export default function Navbar() {
     const handleMouseMove = (e: MouseEvent) => {
       setMousePosition({ x: e.clientX, y: e.clientY });
     };
-    
+
     window.addEventListener("scroll", handleScroll, { passive: true });
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
-    
+
     return () => {
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("mousemove", handleMouseMove);
@@ -39,7 +40,7 @@ export default function Navbar() {
   // Calculate dynamic effects based on scroll position
   const glassIntensity = Math.min(scrollPosition / 200, 1);
   const blurAmount = 8 + (glassIntensity * 12);
-  
+
   return (
     <>
       <style>{`
@@ -96,7 +97,8 @@ export default function Navbar() {
           overflow: hidden;
           border-radius: 0.75rem;
           transition: all 0.3s ease;
-          margin-right: 33rem;
+          /* margin-right: 33rem; */
+          margin-right: 1.5rem; /* Reduced margin for better alignment */
           margin-left: -1rem;
         }
 
@@ -326,7 +328,7 @@ export default function Navbar() {
         <div className="floating-orb"></div>
         <div className="floating-orb"></div>
         <div className="floating-orb"></div>
-        
+
         <div className="glass-nav-container">
           <div className="nav-container-flex">
             <div className="flex-shrink-0 flex items-center" style={{ marginLeft: '-1rem' }}>
@@ -336,7 +338,7 @@ export default function Navbar() {
                 <span className="animated-text ml-2">POD</span>
               </Link>
             </div>
-            
+
             {/* Desktop Navigation - Moved to right */}
             <div className="nav-menu-section">
               <ul className="glass-nav-list">
@@ -395,7 +397,7 @@ export default function Navbar() {
                     <div className="glass-nav-bg"></div>
                   </Link>
                 </li>
-                
+
                 {/* ADMIN LINK - PROPERLY PLACED */}
                 {isAdmin && (
                   <li>
@@ -412,7 +414,7 @@ export default function Navbar() {
                 )}
               </ul>
             </div>
-            
+
             {/* Mobile Navigation */}
             <Sheet>
               <SheetTrigger asChild className="md:hidden">
@@ -421,8 +423,8 @@ export default function Navbar() {
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent 
-                side="right" 
+              <SheetContent
+                side="right"
                 className="w-[240px] sm:w-[300px] bg-gradient-to-br from-slate-900/95 to-black/95 backdrop-blur-xl text-white border-red-800/30"
               >
                 <div className="py-4 flex flex-col space-y-4">
@@ -438,7 +440,11 @@ export default function Navbar() {
                   <Link href="/contact" className="px-4 py-2 text-lg font-medium hover:bg-red-800/20 rounded-lg transition-colors">
                     📧 Contact
                   </Link>
-                  
+                  <Link href="/user-orders" className="px-4 py-2 text-lg font-medium hover:bg-red-800/20 rounded-lg transition-colors">
+                    🛒 Orders
+                  </Link>
+
+
                   {/* ADMIN LINK IN MOBILE MENU */}
                   {isAdmin && (
                     <Link href="/admin" className="px-4 py-2 text-lg font-medium hover:bg-green-800/20 rounded-lg transition-colors border border-green-500/30">
