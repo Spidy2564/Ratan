@@ -98,7 +98,7 @@ export default function Navbar() {
           border-radius: 0.75rem;
           transition: all 0.3s ease;
           /* margin-right: 33rem; */
-          margin-right: 1.5rem; /* Reduced margin for better alignment */
+          margin-right: 0; /* No right margin for better alignment */
           margin-left: -1rem;
         }
 
@@ -298,7 +298,7 @@ export default function Navbar() {
           display: flex;
           align-items: center;
           margin-left: auto;
-          margin-right: 4rem;
+          margin-right: -8rem;
         }
 
         @media (max-width: 768px) {
@@ -340,7 +340,7 @@ export default function Navbar() {
             </div>
 
             {/* Desktop Navigation - Moved to right */}
-            <div className="nav-menu-section">
+            <div className="nav-menu-section ml-auto">
               <ul className="glass-nav-list">
                 <li>
                   <Link href="/" className="glass-nav-item group">
