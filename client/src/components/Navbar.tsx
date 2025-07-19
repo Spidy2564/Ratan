@@ -397,21 +397,6 @@ export default function Navbar() {
                     <div className="glass-nav-bg"></div>
                   </Link>
                 </li>
-
-                {/* ADMIN LINK - PROPERLY PLACED */}
-                {isAdmin && (
-                  <li>
-                    <Link href="/admin" className="glass-nav-item admin-nav-item group">
-                      <div className="glass-nav-content">
-                        <span className="nav-icon group-hover:scale-110 transition-transform duration-300">
-                          <Shield size={18} />
-                        </span>
-                        <span className="nav-title">Admin</span>
-                      </div>
-                      <div className="glass-nav-bg admin-nav-bg"></div>
-                    </Link>
-                  </li>
-                )}
               </ul>
             </div>
 
@@ -443,14 +428,6 @@ export default function Navbar() {
                   <Link href="/user-orders" className="px-4 py-2 text-lg font-medium hover:bg-red-800/20 rounded-lg transition-colors">
                     🛒 Orders
                   </Link>
-
-
-                  {/* ADMIN LINK IN MOBILE MENU */}
-                  {isAdmin && (
-                    <Link href="/admin" className="px-4 py-2 text-lg font-medium hover:bg-green-800/20 rounded-lg transition-colors border border-green-500/30">
-                      🛡️ Admin Dashboard
-                    </Link>
-                  )}
                 </div>
               </SheetContent>
             </Sheet>
