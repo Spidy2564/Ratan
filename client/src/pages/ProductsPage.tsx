@@ -2089,13 +2089,13 @@ export default function ProductsPage() {
               {/* Cart and Favorites Buttons */}
               <div className="flex items-center gap-4">
                 {/* Debug button for testing auth */}
-                <button
+                {/* <button
                   onClick={testAuth}
                   className="p-2 bg-yellow-500 bg-opacity-20 rounded-full hover:bg-opacity-30 transition-all transform hover:scale-110 text-xs"
                   title="Test Authentication"
                 >
                   🔐 Test Auth
-                </button>
+                </button> */}
 
                 <button
                   onClick={() => setShowCart(true)}
