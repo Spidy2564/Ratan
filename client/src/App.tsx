@@ -16,8 +16,14 @@ import Footer from "./components/Footer";
 import AnimeMascot from "./components/AnimeMascot";
 import { AuthProvider } from "./contexts/AuthContext";
 import { PurchaseProvider } from "./contexts/PurchaseContext";
+import { CartProvider } from "./contexts/CartContext";
+import { WishlistProvider } from "./contexts/WishlistContext";
 import UserOrders from "./pages/UserOrders";
+import CartPage from "./pages/CartPage";
+import WishlistPage from "./pages/WishlistPage";
+import TestPage from "./pages/TestPage";
 import AuthCallbackPage from './pages/AuthCallbackPage';
+import AccountPage from './pages/AccountPage';
 
 window.addEventListener("DOMContentLoaded", () => {
   const imgs = document.querySelectorAll("img:not([loading])");
@@ -35,7 +41,11 @@ function Router() {
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/products" component={ProductsPage} />
+          <Route path="/cart" component={CartPage} />
+          <Route path="/wishlist" component={WishlistPage} />
+          <Route path="/test" component={TestPage} />
           <Route path="/user-orders" component={UserOrders} />
+          <Route path="/account" component={AccountPage} />
           <Route path="/contact" component={ContactPage} />
           <Route path="/customize" component={CustomizePage} />
           <Route path="/tshirt-designer" component={TShirtDesignerDemo} />
@@ -57,7 +67,11 @@ function App() {
         <Toaster />
         <AuthProvider>
           <PurchaseProvider>
-            <Router />
+            <CartProvider>
+              <WishlistProvider>
+                <Router />
+              </WishlistProvider>
+            </CartProvider>
           </PurchaseProvider>
         </AuthProvider>
       </TooltipProvider>

@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Upload, Save, Eye, Trash2, Package, Loader2, Edit3, X, Image, Camera, CheckCircle, AlertCircle, Search, Filter } from 'lucide-react';
 
 interface Product {
-  id?: number;
+  _id?: string; // MongoDB ObjectId is a string
   name: string;
   description: string;
   price: string;
@@ -12,46 +12,27 @@ interface Product {
   inStock: boolean;
   featured: boolean;
   tags: string;
-  images?: string | string[]; // Can be JSON string or array
+  images?: string | string[]; // Can be JSON string or array or undefined
   createdAt?: string;
   updatedAt?: string;
 }
 
 // ✅ FIXED: Consistent API Base URL
-const API_BASE = window.location.hostname === 'localhost' && window.location.port === '5000' 
-  ? '' 
+const API_BASE = window.location.hostname === 'localhost' && window.location.port === '5000'
+  ? ''
   : 'http://localhost:5000';
 
-// Helper function to resolve image URLs
-const resolveImageUrl = (imageUrl: string): string => {
-  if (!imageUrl) return imageUrl;
-  
-  // If it's a relative URL starting with /uploads, prepend the API base
-  if (imageUrl.startsWith('/uploads/')) {
-    return API_BASE + imageUrl;
-  }
-  
-  // If it's already an absolute URL, return as-is
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-    return imageUrl;
-  }
-  
-  // For other relative URLs, prepend API base
-  if (imageUrl.startsWith('/')) {
-    return API_BASE + imageUrl;
-  }
-  
-  return imageUrl;
-};
+
+// Helper function to map _id to string
+const mapProduct = (p: any): Product => ({ ...p, _id: p._id?.toString() });
 
 // ✅ FIXED: API Functions with proper response handling
 const fetchProducts = async (): Promise<Product[]> => {
   const response = await fetch(`${API_BASE}/api/products`);
   if (!response.ok) throw new Error('Failed to fetch products');
   const data = await response.json();
-  
-  // ✅ FIXED: Handle both response formats from backend
-  const products = data.data || data;
+  // Map _id to id for frontend compatibility
+  const products = (data.data || data).map(mapProduct);
   console.log('📦 Admin: Fetched products:', products);
   return Array.isArray(products) ? products : [];
 };
@@ -59,29 +40,29 @@ const fetchProducts = async (): Promise<Product[]> => {
 const addProduct = async (productData: Omit<Product, 'id'>): Promise<Product> => {
   console.log('🌐 API: Sending product data to backend:', JSON.stringify(productData, null, 2));
   console.log('📸 API: Images field being sent:', productData.images);
-  
+
   const response = await fetch(`${API_BASE}/api/products`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(productData),
   });
-  
+
   console.log('📡 API: Response status:', response.status);
-  
+
   if (!response.ok) {
     const errorData = await response.json();
     console.error('❌ API: Error response:', errorData);
     throw new Error(errorData.message || 'Failed to add product');
   }
-  
+
   const result = await response.json();
   console.log('✅ API: Success response:', JSON.stringify(result, null, 2));
-  
-  // ✅ FIXED: Handle both response formats
-  return result.data || result;
+
+  // Map _id to id
+  return mapProduct(result.data || result);
 };
 
-const updateProduct = async (id: number, productData: Partial<Product>): Promise<Product> => {
+const updateProduct = async (id: string, productData: Partial<Product>): Promise<Product> => {
   const response = await fetch(`${API_BASE}/api/products/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -92,10 +73,10 @@ const updateProduct = async (id: number, productData: Partial<Product>): Promise
     throw new Error(errorData.message || 'Failed to update product');
   }
   const result = await response.json();
-  return result.data || result;
+  return mapProduct(result.data || result);
 };
 
-const deleteProduct = async (id: number): Promise<void> => {
+const deleteProduct = async (id: string): Promise<void> => {
   const response = await fetch(`${API_BASE}/api/products/${id}`, {
     method: 'DELETE',
   });
@@ -108,27 +89,27 @@ const deleteProduct = async (id: number): Promise<void> => {
 // Simple base64 image upload function
 const uploadImage = async (file: File): Promise<string> => {
   console.log('📸 Starting upload for:', file.name, 'Size:', (file.size / 1024).toFixed(2) + 'KB');
-  
+
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    
+
     reader.onload = async (e) => {
       try {
         const base64Data = e.target?.result as string;
-        
+
         if (!base64Data) {
           throw new Error('Failed to read file as base64');
         }
-        
+
         console.log('📸 Base64 data generated, length:', base64Data.length);
-        
+
         const uploadPayload = {
           image: base64Data,
           filename: file.name
         };
-        
+
         console.log('📸 Sending upload request to:', `${API_BASE}/api/upload`);
-        
+
         const response = await fetch(`${API_BASE}/api/upload`, {
           method: 'POST',
           headers: {
@@ -136,18 +117,18 @@ const uploadImage = async (file: File): Promise<string> => {
           },
           body: JSON.stringify(uploadPayload),
         });
-        
+
         console.log('📸 Upload response status:', response.status);
-        
+
         if (!response.ok) {
           const errorText = await response.text();
           console.error('❌ Upload failed:', response.status, errorText);
           throw new Error(`Upload failed: ${response.status} - ${errorText}`);
         }
-        
+
         const result = await response.json();
         console.log('📸 Upload response:', result);
-        
+
         if (result.success && result.imageUrl) {
           console.log('✅ Image uploaded successfully:', result.imageUrl);
           resolve(result.imageUrl);
@@ -160,12 +141,12 @@ const uploadImage = async (file: File): Promise<string> => {
         reject(error instanceof Error ? error : new Error(String(error)));
       }
     };
-    
+
     reader.onerror = (error) => {
       console.error('❌ FileReader error:', error);
       reject(new Error('Failed to read file'));
     };
-    
+
     reader.readAsDataURL(file);
   });
 };
@@ -179,55 +160,55 @@ const PhotoUpload = ({ images, onImagesChange, isUploading, setIsUploading }: {
   isUploading: boolean;
   setIsUploading: (loading: boolean) => void;
 }) => {
-const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = Array.from(e.target.files || []);
-  if (files.length === 0) return;
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-  console.log(`📂 Starting upload of ${files.length} files:`, files.map(f => f.name));
-  setIsUploading(true);
-  
-  try {
-    const uploadPromises = files.map(async (file, index) => {
-      console.log(`📤 Uploading file ${index + 1}/${files.length}: ${file.name}`);
-      
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        throw new Error(`File ${file.name} is too large. Max size is 5MB.`);
+    console.log(`📂 Starting upload of ${files.length} files:`, files.map(f => f.name));
+    setIsUploading(true);
+
+    try {
+      const uploadPromises = files.map(async (file, index) => {
+        console.log(`📤 Uploading file ${index + 1}/${files.length}: ${file.name}`);
+
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+          throw new Error(`File ${file.name} is too large. Max size is 5MB.`);
+        }
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          throw new Error(`File ${file.name} is not an image.`);
+        }
+
+        const imageUrl = await uploadImage(file);
+        console.log(`✅ Upload ${index + 1} completed:`, imageUrl);
+        return imageUrl;
+      });
+
+      const newImageUrls = await Promise.all(uploadPromises);
+      console.log('✅ All uploads completed:', newImageUrls);
+
+      // Validate that all URLs are valid
+      const validUrls = newImageUrls.filter(url => url && url.trim() !== '');
+      if (validUrls.length !== newImageUrls.length) {
+        console.warn('⚠️ Some uploads returned empty URLs');
       }
-      
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        throw new Error(`File ${file.name} is not an image.`);
-      }
-      
-      const imageUrl = await uploadImage(file);
-      console.log(`✅ Upload ${index + 1} completed:`, imageUrl);
-      return imageUrl;
-    });
-    
-    const newImageUrls = await Promise.all(uploadPromises);
-    console.log('✅ All uploads completed:', newImageUrls);
-    
-    // Validate that all URLs are valid
-    const validUrls = newImageUrls.filter(url => url && url.trim() !== '');
-    if (validUrls.length !== newImageUrls.length) {
-      console.warn('⚠️ Some uploads returned empty URLs');
+
+      onImagesChange([...images, ...validUrls]);
+
+      // Show success message
+      console.log(`🎉 Successfully uploaded ${validUrls.length} images!`);
+
+    } catch (error) {
+      console.error('❌ Upload failed:', error);
+      alert(`Failed to upload images: ${error.message}`);
+    } finally {
+      setIsUploading(false);
+      // Clear the input so the same files can be uploaded again if needed
+      e.target.value = '';
     }
-    
-    onImagesChange([...images, ...validUrls]);
-    
-    // Show success message
-    console.log(`🎉 Successfully uploaded ${validUrls.length} images!`);
-    
-  } catch (error) {
-    console.error('❌ Upload failed:', error);
-    alert(`Failed to upload images: ${error.message}`);
-  } finally {
-    setIsUploading(false);
-    // Clear the input so the same files can be uploaded again if needed
-    e.target.value = '';
-  }
-};
+  };
 
   const removeImage = (indexToRemove: number) => {
     const newImages = images.filter((_, index) => index !== indexToRemove);
@@ -244,7 +225,7 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
           {images.length}/10 photos
         </span>
       </div>
-      
+
       {/* Upload Area */}
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
         <input
@@ -285,7 +266,7 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
           {images.map((imageUrl, index) => (
             <div key={index} className="relative group">
               <img
-                src={resolveImageUrl(imageUrl)}
+                src={(imageUrl)}
                 alt={`Product photo ${index + 1}`}
                 className="w-full h-24 object-cover rounded-lg border"
               />
@@ -318,7 +299,7 @@ const ProductForm = ({ product, onSubmit, onCancel, isSubmitting }: {
   // ✅ FIX: Properly initialize images as array
   const initializeImages = (productImages?: string | string[]): string[] => {
     if (!productImages) return [];
-    
+
     if (typeof productImages === 'string') {
       try {
         const parsed = JSON.parse(productImages);
@@ -327,7 +308,7 @@ const ProductForm = ({ product, onSubmit, onCancel, isSubmitting }: {
         return [];
       }
     }
-    
+
     return Array.isArray(productImages) ? productImages : [];
   };
 
@@ -346,93 +327,80 @@ const ProductForm = ({ product, onSubmit, onCancel, isSubmitting }: {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState(false);
 
-const validateForm = (): boolean => {
-  const newErrors: Record<string, string> = {};
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
 
-  if (!formData.name.trim()) newErrors.name = 'Product name is required';
-  if (!formData.description.trim()) newErrors.description = 'Description is required';
-  if (!formData.price.trim()) newErrors.price = 'Price is required';
-  
-  // Better image validation
-  const hasUploadedImages = formData.images && Array.isArray(formData.images) && formData.images.length > 0;
-  const hasFallbackUrl = formData.imageUrl && formData.imageUrl.trim();
-  
-  console.log('🔍 Image validation:');
-  console.log('📸 hasUploadedImages:', hasUploadedImages);
-  console.log('📸 hasFallbackUrl:', hasFallbackUrl);
-  console.log('📸 formData.images:', formData.images);
-  console.log('📸 formData.imageUrl:', formData.imageUrl);
-  
-  if (!hasUploadedImages && !hasFallbackUrl) {
-    newErrors.images = 'At least one product image is required (either upload or provide URL)';
-  }
+    if (!formData.name.trim()) newErrors.name = 'Product name is required';
+    if (!formData.description.trim()) newErrors.description = 'Description is required';
+    if (!formData.price.trim()) newErrors.price = 'Price is required';
 
-  setErrors(newErrors);
-  return Object.keys(newErrors).length === 0;
-};
+    // Better image validation
+    const hasUploadedImages = formData.images && Array.isArray(formData.images) && formData.images.length > 0;
+    const hasFallbackUrl = formData.imageUrl && formData.imageUrl.trim();
 
-const handleSubmit = () => {
-  if (!validateForm()) {
-    console.error('❌ Form validation failed');
-    return;
-  }
+    console.log('🔍 Image validation:');
+    console.log('📸 hasUploadedImages:', hasUploadedImages);
+    console.log('📸 hasFallbackUrl:', hasFallbackUrl);
+    console.log('📸 formData.images:', formData.images);
+    console.log('📸 formData.imageUrl:', formData.imageUrl);
 
-  const imageArray = Array.isArray(formData.images) ? formData.images : [];
-  
-  console.log('🚀 SUBMIT - Form Data Check:');
-  console.log('📸 Raw formData.images:', formData.images);
-  console.log('📸 Processed imageArray:', imageArray);
-  console.log('📸 imageArray.length:', imageArray.length);
-  console.log('📸 formData.imageUrl:', formData.imageUrl);
-  
-  // Validate image URLs before submission
-  const validImageUrls = imageArray.filter(url => {
-    const isValid = url && typeof url === 'string' && url.trim() !== '';
-    if (!isValid) {
-      console.warn('⚠️ Invalid image URL found:', url);
+    if (!hasUploadedImages && !hasFallbackUrl) {
+      newErrors.images = 'At least one product image is required (either upload or provide URL)';
     }
-    return isValid;
-  });
-  
-  if (validImageUrls.length !== imageArray.length) {
-    console.error('❌ Some image URLs are invalid!');
-    alert('Some uploaded images have invalid URLs. Please try uploading again.');
-    return;
-  }
-  
-  // Prepare images for backend
-  const imagesToSend = validImageUrls.length > 0 ? JSON.stringify(validImageUrls) : null;
-  
-  // Better fallback logic for main image
-  let mainImageUrl = formData.imageUrl;
-  if (!mainImageUrl && validImageUrls.length > 0) {
-    mainImageUrl = validImageUrls[0]; // Use first uploaded image
-  }
 
-  const submitData = {
-    ...formData,
-    imageUrl: mainImageUrl || '', // Main display image
-    images: imagesToSend, // All images as JSON string for backend
-    tags: formData.tags || '[]'
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  console.log('🚀 FINAL SUBMIT DATA:');
-  console.log('📸 submitData.imageUrl:', submitData.imageUrl);
-  console.log('📸 submitData.images:', submitData.images);
-  console.log('📸 submitData.images type:', typeof submitData.images);
-  
-  if (imagesToSend) {
-    try {
-      const parsedImages = JSON.parse(imagesToSend);
-      console.log('📸 Parsed images array:', parsedImages);
-    } catch (e) {
-      console.error('❌ Invalid JSON in images field:', imagesToSend);
+  const handleSubmit = () => {
+    if (!validateForm()) {
+      console.error('❌ Form validation failed');
+      return;
     }
-  }
-  
-  console.log('📤 Submitting product data...');
-  onSubmit(submitData);
-};
+
+    const imageArray = Array.isArray(formData.images) ? formData.images : [];
+
+    // Validate image URLs before submission
+    const validImageUrls = imageArray.filter(url => {
+      const isValid = url && typeof url === 'string' && url.trim() !== '';
+      if (!isValid) {
+        console.warn('⚠️ Invalid image URL found:', url);
+      }
+      return isValid;
+    });
+
+    if (validImageUrls.length !== imageArray.length) {
+      console.error('❌ Some image URLs are invalid!');
+      alert('Some uploaded images have invalid URLs. Please try uploading again.');
+      return;
+    }
+
+    // Prepare images for backend
+    const imagesToSend = validImageUrls.length > 0 ? JSON.stringify(validImageUrls) : null;
+
+    // Better fallback logic for main image
+    let mainImageUrl = formData.imageUrl;
+    if (!mainImageUrl && validImageUrls.length > 0) {
+      mainImageUrl = validImageUrls[0]; // Use first uploaded image
+    }
+
+    const submitData = {
+      ...formData,
+      imageUrl: mainImageUrl || '', // Main display image
+      images: imagesToSend === null ? undefined : imagesToSend, // never null
+      tags: formData.tags || '[]'
+    };
+
+    if (imagesToSend) {
+      try {
+        const parsedImages = JSON.parse(imagesToSend);
+      } catch (e) {
+        console.error('❌ Invalid JSON in images field:', imagesToSend);
+      }
+    }
+
+    onSubmit(submitData);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -450,8 +418,8 @@ const handleSubmit = () => {
 
   const handleImagesChange = (images: string[]) => {
     console.log('📸 FIXED: Images updated:', images);
-    setFormData(prev => ({ 
-      ...prev, 
+    setFormData(prev => ({
+      ...prev,
       images: images // ✅ Always array
     }));
     if (errors.images) {
@@ -574,7 +542,7 @@ const handleSubmit = () => {
             />
             <label className="ml-2 text-sm text-gray-700">In Stock</label>
           </div>
-          
+
           <div className="flex items-center">
             <input
               type="checkbox"
@@ -623,7 +591,7 @@ const handleSubmit = () => {
 // Product List Component
 const ProductList = ({ onEdit, onDelete }: {
   onEdit: (product: Product) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -636,7 +604,7 @@ const ProductList = ({ onEdit, onDelete }: {
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         product.description.toLowerCase().includes(searchQuery.toLowerCase());
+      product.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -644,7 +612,7 @@ const ProductList = ({ onEdit, onDelete }: {
   // ✅ FIX: Helper function to parse images for display
   const getImageCount = (images?: string | string[]): number => {
     if (!images) return 0;
-    
+
     if (typeof images === 'string') {
       try {
         const parsed = JSON.parse(images);
@@ -653,7 +621,7 @@ const ProductList = ({ onEdit, onDelete }: {
         return 0;
       }
     }
-    
+
     return Array.isArray(images) ? images.length : 0;
   };
 
@@ -751,17 +719,13 @@ const ProductList = ({ onEdit, onDelete }: {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredProducts.map((product) => (
-                <tr key={product.id} className="hover:bg-gray-50">
+                <tr key={product._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <img
-                        src={resolveImageUrl(product.imageUrl)}
+                        src={(product.imageUrl)}
                         alt={product.name}
                         className="w-12 h-12 object-cover rounded-lg mr-4"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = 'https://via.placeholder.com/48x48?text=No+Image';
-                        }}
                       />
                       <div>
                         <div className="text-sm font-medium text-gray-900">
@@ -789,9 +753,8 @@ const ProductList = ({ onEdit, onDelete }: {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col gap-1">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        product.inStock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${product.inStock ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
                         {product.inStock ? 'In Stock' : 'Out of Stock'}
                       </span>
                       {product.featured && (
@@ -810,7 +773,7 @@ const ProductList = ({ onEdit, onDelete }: {
                         <Edit3 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => onDelete(product.id!)}
+                        onClick={() => onDelete(product._id!)}
                         className="text-red-600 hover:text-red-900 p-1 hover:bg-red-50 rounded"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -853,23 +816,23 @@ export default function AdminDashboard() {
     try {
       console.log('🚀 Admin: Starting to add product:', productData.name);
       console.log('📸 Admin: Product data images field:', productData.images);
-      
+
       await addProduct(productData);
-      
+
       // ✅ FIXED: Invalidate ALL possible product query keys
       await queryClient.invalidateQueries({ queryKey: ['products'] });
       await queryClient.invalidateQueries({ queryKey: ['categories'] });
-      
+
       // ✅ FIXED: Also invalidate any products queries with filters
-      await queryClient.invalidateQueries({ 
+      await queryClient.invalidateQueries({
         predicate: (query) => {
           return Array.isArray(query.queryKey) && query.queryKey[0] === 'products';
         }
       });
-      
+
       // ✅ FIXED: Force a refetch to ensure immediate update
       await queryClient.refetchQueries({ queryKey: ['products'] });
-      
+
       setActiveTab('list');
       showNotification('success', 'Product added successfully!');
       console.log('✅ Admin: Product added successfully and cache invalidated');
@@ -882,23 +845,22 @@ export default function AdminDashboard() {
   };
 
   const handleUpdateProduct = async (productData: Product) => {
-    if (!editingProduct?.id) return;
-    
+    if (!editingProduct?._id) return;
     setIsSubmitting(true);
     try {
-      await updateProduct(editingProduct.id, productData);
-      
+      await updateProduct(editingProduct._id, productData);
+
       // ✅ FIXED: Invalidate ALL product queries
       await queryClient.invalidateQueries({ queryKey: ['products'] });
-      await queryClient.invalidateQueries({ 
+      await queryClient.invalidateQueries({
         predicate: (query) => {
           return Array.isArray(query.queryKey) && query.queryKey[0] === 'products';
         }
       });
-      
+
       // ✅ FIXED: Force refetch
       await queryClient.refetchQueries({ queryKey: ['products'] });
-      
+
       setActiveTab('list');
       setEditingProduct(null);
       showNotification('success', 'Product updated successfully!');
@@ -909,23 +871,23 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteProduct = async (id: number) => {
+  const handleDeleteProduct = async (id: string) => {
     if (!confirm('Are you sure you want to delete this product?')) return;
-    
+
     try {
       await deleteProduct(id);
-      
+
       // ✅ FIXED: Invalidate ALL product queries
       await queryClient.invalidateQueries({ queryKey: ['products'] });
-      await queryClient.invalidateQueries({ 
+      await queryClient.invalidateQueries({
         predicate: (query) => {
           return Array.isArray(query.queryKey) && query.queryKey[0] === 'products';
         }
       });
-      
+
       // ✅ FIXED: Force refetch
       await queryClient.refetchQueries({ queryKey: ['products'] });
-      
+
       showNotification('success', 'Product deleted successfully!');
     } catch (error: any) {
       showNotification('error', error.message || 'Failed to delete product');
@@ -951,9 +913,8 @@ export default function AdminDashboard() {
 
       {/* Notification */}
       {notification && (
-        <div className={`fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg ${
-          notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-        }`}>
+        <div className={`fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg ${notification.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+          }`}>
           <div className="flex items-center gap-2">
             {notification.type === 'success' ? (
               <CheckCircle className="w-5 h-5" />
@@ -972,21 +933,19 @@ export default function AdminDashboard() {
             <nav className="-mb-px flex space-x-8">
               <button
                 onClick={() => setActiveTab('list')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'list'
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'list'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 📋 All Products
               </button>
               <button
                 onClick={() => setActiveTab('add')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'add'
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'add'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 ➕ Add Product
               </button>

@@ -1,18 +1,43 @@
-import React from "react";
-import { useState, useEffect } from "react";
+import React, { useRef, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "../components/ui/button";
-import { Menu, Home, Palette, Mail, ShoppingBag, Shield } from "lucide-react";
+import { Menu, Home, Palette, Mail, ShoppingBag, Shield, User, LogOut, ShoppingCart, Heart } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "../components/ui/sheet";
 import { useAuth } from "../contexts/AuthContext"; // FIXED: Changed from "../../contexts/AuthContext" to "../contexts/AuthContext"
+import { useCart } from "../contexts/CartContext";
+import { useWishlist } from "../contexts/WishlistContext";
+import AuthModal from "../components/auth/AuthModal";
 
 export default function Navbar() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const { state: cartState } = useCart();
+  const { state: wishlistState } = useWishlist();
   const isAdmin = user?.email === 'admin@tshirtapp.com' || user?.role === 'admin';
 
   const [isOpen, setIsOpen] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    }
+    if (showDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showDropdown]);
 
   const toggleMobileMenu = () => {
     setIsOpen(!isOpen);
@@ -386,16 +411,50 @@ export default function Navbar() {
                     <div className="glass-nav-bg"></div>
                   </Link>
                 </li>
+                {/* User Menu */}
                 <li>
-                  <Link href="/user-orders" className="glass-nav-item group">
-                    <div className="glass-nav-content">
-                      <span className="nav-icon group-hover:scale-110 transition-transform duration-300">
-                        <ShoppingBag size={18} />
-                      </span>
-                      <span className="nav-title">Orders</span>
+                  {!user ? (
+                    <button className="glass-nav-item group" onClick={() => setShowAuthModal(true)}>
+                      <div className="glass-nav-content">
+                        <span className="nav-icon group-hover:scale-110 transition-transform duration-300">
+                          <User size={18} />
+                        </span>
+                        <span className="nav-title">Account</span>
+                      </div>
+                      <div className="glass-nav-bg"></div>
+                    </button>
+                  ) : (
+                    <div style={{ position: 'relative' }} ref={dropdownRef}>
+                      <button className="glass-nav-item group" onClick={() => setShowDropdown((v) => !v)}>
+                        <div className="glass-nav-content">
+                          <span className="nav-icon group-hover:scale-110 transition-transform duration-300">
+                            <User size={18} />
+                          </span>
+                          <span className="nav-title">Account</span>
+                        </div>
+                        <div className="glass-nav-bg"></div>
+                      </button>
+                      {showDropdown && (
+                        <div className="glass-dropdown" style={{ position: 'absolute', right: 0, top: '2.5rem', minWidth: '160px' }}>
+                          <Link href="/account" className="glass-dropdown-item block" onClick={() => setShowDropdown(false)}>
+                            <User size={16} className="inline mr-2" /> My Account
+                          </Link>
+                          <Link href="/cart" className="glass-dropdown-item block" onClick={() => setShowDropdown(false)}>
+                            <ShoppingCart size={16} className="inline mr-2" /> My Cart
+                          </Link>
+                          <Link href="/wishlist" className="glass-dropdown-item block" onClick={() => setShowDropdown(false)}>
+                            <Heart size={16} className="inline mr-2" /> My Wishlist
+                          </Link>
+                          <Link href="/user-orders" className="glass-dropdown-item block" onClick={() => setShowDropdown(false)}>
+                            <ShoppingBag size={16} className="inline mr-2" /> My Orders
+                          </Link>
+                          <button className="glass-dropdown-item block w-full text-left" onClick={() => { logout(); setShowDropdown(false); }}>
+                            <LogOut size={16} className="inline mr-2" /> Logout
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div className="glass-nav-bg"></div>
-                  </Link>
+                  )}
                 </li>
               </ul>
             </div>
@@ -425,15 +484,68 @@ export default function Navbar() {
                   <Link href="/contact" className="px-4 py-2 text-lg font-medium hover:bg-red-800/20 rounded-lg transition-colors">
                     📧 Contact
                   </Link>
-                  <Link href="/user-orders" className="px-4 py-2 text-lg font-medium hover:bg-red-800/20 rounded-lg transition-colors">
-                    🛒 Orders
+                  <Link href="/cart" className="px-4 py-2 text-lg font-medium hover:bg-red-800/20 rounded-lg transition-colors flex items-center justify-between">
+                    🛒 Cart
+                    {cartState.cart && cartState.cart.itemCount > 0 && (
+                      <span className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {cartState.cart.itemCount}
+                      </span>
+                    )}
                   </Link>
+                  <Link href="/wishlist" className="px-4 py-2 text-lg font-medium hover:bg-red-800/20 rounded-lg transition-colors flex items-center justify-between">
+                    ❤️ Wishlist
+                    {wishlistState.wishlist && wishlistState.wishlist.itemCount > 0 && (
+                      <span className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {wishlistState.wishlist.itemCount}
+                      </span>
+                    )}
+                  </Link>
+                  {!user ? (
+                    <Button className="glass-nav-item group w-full justify-center text-lg" onClick={() => setShowAuthModal(true)}>
+                      <div className="glass-nav-content">
+                        <span className="nav-title">Login</span>
+                      </div>
+                      <div className="glass-nav-bg"></div>
+                    </Button>
+                  ) : (
+                    <div style={{ position: 'relative' }} ref={dropdownRef}>
+                      <Button className="glass-nav-item group w-full justify-center text-lg" onClick={() => setShowDropdown((v) => !v)}>
+                        <User size={20} /> Account
+                      </Button>
+                      {showDropdown && (
+                        <div className="glass-dropdown" style={{ position: 'absolute', right: 0, top: '2.5rem', minWidth: '160px' }}>
+                          <Link href="/account" className="glass-dropdown-item block" onClick={() => setShowDropdown(false)}>
+                            <User size={16} className="inline mr-2" /> My Account
+                          </Link>
+                          <Link href="/cart" className="glass-dropdown-item block" onClick={() => setShowDropdown(false)}>
+                            <ShoppingCart size={16} className="inline mr-2" /> My Cart
+                          </Link>
+                          <Link href="/wishlist" className="glass-dropdown-item block" onClick={() => setShowDropdown(false)}>
+                            <Heart size={16} className="inline mr-2" /> My Wishlist
+                          </Link>
+                          <Link href="/user-orders" className="glass-dropdown-item block" onClick={() => setShowDropdown(false)}>
+                            <ShoppingBag size={16} className="inline mr-2" /> My Orders
+                          </Link>
+                          <button className="glass-dropdown-item block w-full text-left" onClick={() => { logout(); setShowDropdown(false); }}>
+                            <LogOut size={16} className="inline mr-2" /> Logout
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </SheetContent>
             </Sheet>
           </div>
         </div>
       </nav>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        defaultMode="login"
+      />
     </>
   );
 }

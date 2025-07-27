@@ -19,10 +19,17 @@ import { protect } from './middleware/auth.js';
 // Import routes
 import authRoutes from './routes/auth.js';
 import purchaseRoutes from './routes/purchases.js';
+import cartRoutes from './routes/cart.js';
+import wishlistRoutes from './routes/wishlist.js';
+import { registerRoutes } from './routes';
 
 // Import models to ensure they are registered with mongoose
 import './models/user.js';
 import './models/Purchase.js';
+import './models/Product.js'; // Added Product model import
+import './models/Cart.js'; // Added Cart model import
+import './models/Wishlist.js'; // Added Wishlist model import
+import { storage } from './storage'; // Added storage import
 
 // Get __dirname equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -131,7 +138,7 @@ app.post('/api/contact', async (req, res) => {
 
   try {
     await transporter.sendMail({
-      from: email,
+      from: process.env.FROM_CONTACT_EMAIL,
       to: supportEmail,
       subject,
       html,
@@ -148,6 +155,18 @@ app.post('/api/contact', async (req, res) => {
 // ================================
 
 app.use('/api/purchases', purchaseRoutes);
+
+// ================================
+// 🛒 CART ROUTES
+// ================================
+
+app.use('/api/cart', cartRoutes);
+
+// ================================
+// ❤️ WISHLIST ROUTES
+// ================================
+
+app.use('/api/wishlist', wishlistRoutes);
 
 // Ironspidy Code
 app.post('/api/mail', async (req, res) => {
@@ -226,10 +245,10 @@ const connectDB = async (): Promise<void> => {
       const conn = await mongoose.connect(process.env.MONGODB_URI);
       console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
 
-            // Create default admin user if it doesn't exist
+      // Create default admin user if it doesn't exist
       const User = mongoose.model('User');
       const adminUser = await User.findOne({ email: 'admin@tshirtapp.com' });
-      
+
       if (!adminUser) {
         const newAdmin = new User({
           email: 'admin@tshirtapp.com',
@@ -240,14 +259,14 @@ const connectDB = async (): Promise<void> => {
           isEmailVerified: true,
           isActive: true,
         });
-        
+
         await newAdmin.save();
         console.log('✅ Default admin user created');
       }
 
-            // Create default superadmin user if it doesn't exist
+      // Create default superadmin user if it doesn't exist
       const superAdminUser = await User.findOne({ email: 'superadmin@tshirtapp.com' });
-      
+
       if (!superAdminUser) {
         const newSuperAdmin = new User({
           email: 'superadmin@tshirtapp.com',
@@ -258,14 +277,14 @@ const connectDB = async (): Promise<void> => {
           isEmailVerified: true,
           isActive: true,
         });
-        
+
         await newSuperAdmin.save();
         console.log('✅ Default superadmin user created');
       }
 
-            // Create default test user if it doesn't exist
+      // Create default test user if it doesn't exist
       const testUser = await User.findOne({ email: 'user@test.com' });
-      
+
       if (!testUser) {
         const newTestUser = new User({
           email: 'user@test.com',
@@ -276,7 +295,7 @@ const connectDB = async (): Promise<void> => {
           isEmailVerified: true,
           isActive: true,
         });
-        
+
         await newTestUser.save();
         console.log('✅ Default test user created');
       }
@@ -296,111 +315,6 @@ connectDB();
 // ================================
 // 🗄️ SAMPLE DATA
 // ================================
-
-// Define the product type
-interface Product {
-  id: number;
-  name: string;
-  description: string;
-  price: string;
-  category: string;
-  inStock: boolean;
-  featured: boolean;
-  images: string | null;
-  imageUrl: string;
-  tags: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-let sampleProducts: Product[] = [
-  {
-    id: 1,
-    name: 'Naruto Uzumaki Orange T-Shirt',
-    description: 'High-quality Naruto-themed orange t-shirt featuring the iconic orange jumpsuit design. Perfect for anime fans who want to show their love for the Hidden Leaf Village.',
-    price: '599',
-    category: 'T-Shirts',
-    inStock: true,
-    featured: true,
-    images: null,
-    imageUrl: 'https://images.unsplash.com/photo-1583743814966-8936f37f630e?w=500&h=600&fit=crop',
-    tags: '["anime", "naruto", "orange", "jumpsuit", "ninja"]',
-    createdAt: '2024-01-15T00:00:00.000Z',
-    updatedAt: '2024-01-15T00:00:00.000Z'
-  },
-  {
-    id: 2,
-    name: 'Attack on Titan Scout Regiment T-Shirt',
-    description: 'Official Attack on Titan Scout Regiment t-shirt with the Wings of Freedom logo. Join the fight against titans with this premium quality tee.',
-    price: '649',
-    category: 'T-Shirts',
-    inStock: true,
-    featured: false,
-    images: null,
-    imageUrl: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=500&h=600&fit=crop',
-    tags: '["anime", "attack-on-titan", "scout-regiment", "wings-of-freedom"]',
-    createdAt: '2024-01-16T00:00:00.000Z',
-    updatedAt: '2024-01-16T00:00:00.000Z'
-  },
-  {
-    id: 3,
-    name: 'One Piece Luffy Straw Hat Hoodie',
-    description: 'Cozy hoodie featuring Monkey D. Luffy and his iconic straw hat. Perfect for staying warm while showing your pirate spirit.',
-    price: '1299',
-    category: 'Hoodies',
-    inStock: true,
-    featured: true,
-    images: null,
-    imageUrl: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=500&h=600&fit=crop',
-    tags: '["anime", "one-piece", "luffy", "straw-hat", "pirate"]',
-    createdAt: '2024-01-17T00:00:00.000Z',
-    updatedAt: '2024-01-17T00:00:00.000Z'
-  },
-  {
-    id: 4,
-    name: 'Demon Slayer Tanjiro Phone Cover',
-    description: 'Protect your phone with this stunning Demon Slayer design featuring Tanjiro and his signature water breathing technique.',
-    price: '299',
-    category: 'Phone Covers',
-    inStock: true,
-    featured: false,
-    images: null,
-    imageUrl: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500&h=600&fit=crop',
-    tags: '["anime", "demon-slayer", "phone-cover", "tanjiro", "water-breathing"]',
-    createdAt: '2024-01-18T00:00:00.000Z',
-    updatedAt: '2024-01-18T00:00:00.000Z'
-  },
-  {
-    id: 5,
-    name: 'Dragon Ball Z Saiyan Warrior Bottle',
-    description: 'Stay hydrated like a Saiyan warrior with this premium Dragon Ball Z water bottle featuring Goku in Super Saiyan form.',
-    price: '499',
-    category: 'Bottles',
-    inStock: true,
-    featured: false,
-    images: null,
-    imageUrl: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500&h=600&fit=crop',
-    tags: '["anime", "dragon-ball-z", "goku", "saiyan", "water-bottle"]',
-    createdAt: '2024-01-19T00:00:00.000Z',
-    updatedAt: '2024-01-19T00:00:00.000Z'
-  },
-  {
-    id: 6,
-    name: 'My Hero Academia All Might Plate Set',
-    description: 'Dine like a hero with this My Hero Academia plate set featuring All Might and other pro heroes. Perfect for anime-themed meals.',
-    price: '799',
-    category: 'Plates',
-    inStock: true,
-    featured: false,
-    images: null,
-    imageUrl: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=500&h=600&fit=crop',
-    tags: '["anime", "my-hero-academia", "all-might", "heroes", "dining"]',
-    createdAt: '2024-01-20T00:00:00.000Z',
-    updatedAt: '2024-01-20T00:00:00.000Z'
-  }
-];
-
-let nextProductId = 7;
 
 // Store orders in memory
 let orders: any[] = [];
@@ -426,206 +340,21 @@ app.get('/api/health', (req, res) => {
 // 📋 PRODUCTS ENDPOINTS
 // ================================
 
-app.get('/api/products', (req, res) => {
-  console.log(`📋 GET /api/products - Returning ${sampleProducts.length} products`);
+// Register MongoDB-backed API routes
+registerRoutes(app);
 
-  let filteredProducts = [...sampleProducts];
-  const { category, featured, inStock } = req.query;
-
-  if (category && category !== 'All') {
-    filteredProducts = filteredProducts.filter(p => p.category === category);
-  }
-
-  if (featured !== undefined) {
-    const featuredFilter = featured === 'true';
-    filteredProducts = filteredProducts.filter(p => p.featured === featuredFilter);
-  }
-
-  if (inStock !== undefined) {
-    const inStockFilter = inStock === 'true';
-    filteredProducts = filteredProducts.filter(p => p.inStock === inStockFilter);
-  }
-
-  res.status(200).json({
-    success: true,
-    message: 'Products retrieved successfully',
-    data: filteredProducts,
-    count: filteredProducts.length,
-    total: sampleProducts.length
-  });
-});
-
-app.get('/api/products/categories', (req, res) => {
-  const categories = [...new Set(sampleProducts.map(p => p.category))];
-
-  res.status(200).json({
-    success: true,
-    message: 'Categories retrieved successfully',
-    data: categories,
-    count: categories.length
-  });
-});
-
-app.get('/api/products/:id', (req, res) => {
-  const { id } = req.params;
-  const product = sampleProducts.find(p => p.id === Number(id));
-
-  if (!product) {
-    return res.status(404).json({
-      success: false,
-      message: 'Product not found'
-    });
-  }
-
-  res.status(200).json({
-    success: true,
-    message: 'Product retrieved successfully',
-    data: product
-  });
-});
-
-app.post('/api/products', (req, res) => {
+// Update /api/products/categories to use storage abstraction
+app.get('/api/products/categories', async (req, res) => {
   try {
-    const { name, description, price, category, images, imageUrl, inStock, featured, tags } = req.body;
-
-    if (!name || !description || !price || !category) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide all required fields: name, description, price, category'
-      });
-    }
-
-    let productImages = null;
-    let mainImageUrl = '';
-
-    if (images && images !== 'null' && images !== '[]') {
-      try {
-        if (typeof images === 'string') {
-          const parsedImages = JSON.parse(images);
-          if (Array.isArray(parsedImages) && parsedImages.length > 0) {
-            productImages = images;
-            mainImageUrl = parsedImages[0];
-          }
-        } else if (Array.isArray(images) && images.length > 0) {
-          productImages = JSON.stringify(images);
-          mainImageUrl = images[0];
-        }
-      } catch (e) {
-        console.log('⚠️ Error parsing images');
-      }
-    }
-
-    if (!mainImageUrl && imageUrl) {
-      mainImageUrl = imageUrl;
-    }
-
-    if (!mainImageUrl) {
-      mainImageUrl = 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=500&h=600&fit=crop';
-    }
-
-    const newProduct = {
-      id: nextProductId++,
-      name: name.trim(),
-      description: description.trim(),
-      price: parseFloat(price).toFixed(0),
-      category,
-      images: productImages as any, // Fix type issue
-      imageUrl: mainImageUrl,
-      inStock: inStock !== false,
-      featured: featured || false,
-      tags: tags || '[]',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    sampleProducts.push(newProduct);
-
-    res.status(201).json({
-      success: true,
-      message: 'Product created successfully',
-      data: newProduct
-    });
-
-  } catch (error: unknown) {
-    console.error('❌ Product creation error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create product',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-app.put('/api/products/:id', (req, res) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
-
-    const productIndex = sampleProducts.findIndex(p => p.id === parseInt(id));
-
-    if (productIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
-
-    const updatedProduct = {
-      ...sampleProducts[productIndex],
-      ...updateData,
-      id: parseInt(id),
-      updatedAt: new Date().toISOString()
-    };
-
-    sampleProducts[productIndex] = updatedProduct;
-
+    const categories = await storage.getCategories();
     res.status(200).json({
       success: true,
-      message: 'Product updated successfully',
-      data: updatedProduct
+      message: 'Categories retrieved successfully',
+      data: categories,
+      count: categories.length
     });
-
-  } catch (error: any) {
-    console.error('❌ Product update error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update product',
-      error: error.message
-    });
-  }
-});
-
-app.delete('/api/products/:id', (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const productIndex = sampleProducts.findIndex(p => p.id === parseInt(id));
-
-    if (productIndex === -1) {
-      return res.status(404).json({
-        success: false,
-        message: 'Product not found'
-      });
-    }
-
-    const deletedProduct = sampleProducts.splice(productIndex, 1)[0];
-
-    res.status(200).json({
-      success: true,
-      message: 'Product deleted successfully',
-      data: {
-        id: parseInt(id),
-        deletedAt: new Date().toISOString()
-      }
-    });
-
-  } catch (error: any) {
-    console.error('❌ Product deletion error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete product',
-      error: error.message
-    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch categories' });
   }
 });
 
@@ -791,9 +520,9 @@ app.get('/api/admin/stats', (req, res) => {
     recentOrders: recentOrders.length,
     recentRevenue,
     connectedAdmins: 0, // Removed notificationService.getConnectedAdmins()
-    totalProducts: sampleProducts.length,
-    featuredProducts: sampleProducts.filter(p => p.featured).length,
-    inStockProducts: sampleProducts.filter(p => p.inStock).length
+    totalProducts: 0, // No longer fetching from sampleProducts
+    featuredProducts: 0, // No longer fetching from sampleProducts
+    inStockProducts: 0 // No longer fetching from sampleProducts
   };
 
   res.status(200).json({
@@ -884,10 +613,10 @@ app.get('/', (req, res) => {
       upload: '/api/upload'
     },
     stats: {
-      totalProducts: sampleProducts.length,
+      totalProducts: 0, // No longer fetching from sampleProducts
       totalOrders: orders.length,
-      featuredProducts: sampleProducts.filter(p => p.featured).length,
-      categories: [...new Set(sampleProducts.map(p => p.category))].length,
+      featuredProducts: 0, // No longer fetching from sampleProducts
+      categories: 0, // No longer fetching from sampleProducts
       connectedAdmins: 0 // Removed notificationService.getConnectedAdmins()
     },
     notifications: {
@@ -992,9 +721,9 @@ const serverInstance = server.listen(PORT, () => {
    📊 Admin Stats: http://localhost:${PORT}/api/admin/stats
 
 📊 Current Data:
-   🛍️ Products: ${sampleProducts.length}
-   ⭐ Featured: ${sampleProducts.filter(p => p.featured).length}
-   📦 Categories: ${[...new Set(sampleProducts.map(p => p.category))].length}
+   🛍️ Products: ${0} // No longer fetching from sampleProducts
+   ⭐ Featured: ${0} // No longer fetching from sampleProducts
+   📦 Categories: ${0} // No longer fetching from sampleProducts
    🛒 Orders: ${orders.length}
 
 🔔 Notification System:

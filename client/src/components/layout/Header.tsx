@@ -92,11 +92,11 @@ export const Header: React.FC = () => {
                       </div>
 
                       <a
-                        href="/profile"
+                        href="/account"
                         className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
                         <User className="w-4 h-4 mr-3" />
-                        Profile
+                        My Account
                       </a>
 
                       <a

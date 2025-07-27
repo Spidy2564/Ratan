@@ -1,9 +1,32 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { contactFormSchema, productSchema, updateProductSchema } from "@shared/schema";
-import { ZodError } from "zod";
+import { ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
+
+// Define schemas locally (replace @shared/schema)
+const contactFormSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  orderNumber: z.string().optional(),
+  inquiryType: z.string().min(1),
+  message: z.string().min(1),
+});
+
+const productSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().min(1),
+  price: z.string().min(1),
+  category: z.string().min(1),
+  inStock: z.boolean().optional(),
+  featured: z.boolean().optional(),
+  imageUrl: z.string().optional(),
+  tags: z.string().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
+const updateProductSchema = productSchema.partial();
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API endpoint for contact form submissions
@@ -50,13 +73,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const products = await storage.getProducts(Object.keys(filters).length > 0 ? filters : undefined);
-      
-      // Debug logging
-      console.log('📦 Returning products:', products.length);
-      if (products.length > 0) {
-        console.log('🖼️ First product images field:', products[0].images);
-        console.log('📄 First product full data:', JSON.stringify(products[0], null, 2));
-      }
       
       res.status(200).json({
         success: true,
@@ -172,14 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PUT /api/products/:id - Update a product
   app.put("/api/products/:id", async (req, res) => {
     try {
-      const productId = parseInt(req.params.id);
-      
-      if (isNaN(productId)) {
-        return res.status(400).json({ message: "Invalid product ID" });
-      }
-      
-      console.log('📝 Received update data:', JSON.stringify(req.body, null, 2));
-      console.log('📸 Images field in update:', req.body.images);
+      const productId = req.params.id;
       
       // Extract images separately before validation
       const { images, ...updateDataWithoutImages } = req.body;
@@ -193,7 +202,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...(images !== undefined && { images })
       };
       
-      console.log('✅ Final update data:', JSON.stringify(updateWithImages, null, 2));
       
       // Update the product
       const updatedProduct = await storage.updateProduct(productId, updateWithImages);
@@ -224,11 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // DELETE /api/products/:id - Delete a product
   app.delete("/api/products/:id", async (req, res) => {
     try {
-      const productId = parseInt(req.params.id);
-      
-      if (isNaN(productId)) {
-        return res.status(400).json({ message: "Invalid product ID" });
-      }
+      const productId = req.params.id;
       
       const deleted = await storage.deleteProduct(productId);
       
