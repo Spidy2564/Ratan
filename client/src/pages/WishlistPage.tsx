@@ -8,6 +8,54 @@ import { Badge } from '../components/ui/badge';
 import { Trash2, Heart, ShoppingCart, ArrowLeft, Plus } from 'lucide-react';
 import { Link } from 'wouter';
 
+// RobustImage component for better image loading
+const RobustImage = ({
+  src,
+  alt,
+  className = '',
+  fallbackSrc = "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=500&h=300&fit=crop",
+  ...props
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  fallbackSrc?: string;
+  [key: string]: any;
+}) => {
+  const [imageSrc, setImageSrc] = useState(src);
+  const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const handleError = () => {
+    if (!hasError) {
+      setHasError(true);
+      setImageSrc(fallbackSrc);
+    }
+  };
+
+  const handleLoad = () => {
+    setIsLoading(false);
+  };
+
+  return (
+    <div className={`relative ${className}`}>
+      {isLoading && (
+        <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
+          <div className="text-gray-400 text-sm">Loading...</div>
+        </div>
+      )}
+      <img
+        src={imageSrc}
+        alt={alt}
+        className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+        onError={handleError}
+        onLoad={handleLoad}
+        {...props}
+      />
+    </div>
+  );
+};
+
 export default function WishlistPage() {
   const { state: wishlistState, removeFromWishlist, clearWishlist } = useWishlist();
   const { addToCart } = useCart();
@@ -93,7 +141,7 @@ export default function WishlistPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-black text-white pt-20">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold">My Wishlist</h1>
           <Button 
@@ -107,12 +155,12 @@ export default function WishlistPage() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {wishlistState.wishlist.items.map((item) => (
-            <Card key={item._id} className="bg-slate-800 border-slate-700 hover:border-slate-600 transition-colors">
+            <Card key={item._id} className="bg-slate-800 border-slate-700 hover:border-slate-600 transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
               <CardContent className="p-4">
-                <div className="relative">
-                  <img
+                <div className="relative group">
+                  <RobustImage
                     src={item.imageUrl || '/placeholder-product.jpg'}
                     alt={item.productName}
                     className="w-full h-48 object-cover rounded-lg mb-4"
@@ -122,14 +170,14 @@ export default function WishlistPage() {
                     variant="ghost"
                     onClick={() => handleRemoveFromWishlist(item.productId)}
                     disabled={loading}
-                    className="absolute top-2 right-2 text-red-400 hover:text-red-300 hover:bg-red-400/10"
+                    className="absolute top-2 right-2 text-red-400 hover:text-red-300 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
                 
-                <div className="space-y-2">
-                  <h3 className="text-lg font-semibold text-white line-clamp-2">
+                <div className="space-y-3">
+                  <h3 className="text-lg font-semibold text-white line-clamp-2 min-h-[3rem]">
                     {item.productName}
                   </h3>
                   <div className="flex items-center justify-between">
@@ -140,22 +188,22 @@ export default function WishlistPage() {
                       </Badge>
                     )}
                   </div>
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-2 pt-2">
                     <Button
-                      className="flex-1 bg-red-600 hover:bg-red-700"
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-sm"
                       size="sm"
                       onClick={() => handleAddToCart(item)}
                       disabled={loading}
                     >
-                      <ShoppingCart className="w-4 h-4 mr-2" />
+                      <ShoppingCart className="w-4 h-4 mr-1" />
                       Add to Cart
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1"
+                      className="flex-1 text-sm"
                     >
-                      <Plus className="w-4 h-4 mr-2" />
+                      <Plus className="w-4 h-4 mr-1" />
                       Quick View
                     </Button>
                   </div>
@@ -165,9 +213,9 @@ export default function WishlistPage() {
           ))}
         </div>
 
-        <div className="mt-8 text-center">
+        <div className="mt-8 text-center space-x-4 text-black">
           <Link href="/products">
-            <Button variant="outline" className="mr-4">
+            <Button variant="outline">
               Continue Shopping
             </Button>
           </Link>
